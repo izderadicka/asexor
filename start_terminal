@@ -1,0 +1,10 @@
+#!/bin/bash
+VENV=".venv/bin/activate"
+
+export PYTHONPATH=~/workspace/asexor
+
+gnome-terminal \
+--tab --title "crossbar" -e "bash --rcfile $VENV -ci 'cd asexor && crossbar start'" \
+--tab --title "server" -e "bash --rcfile $VENV" \
+--tab --title "client" -e "bash --rcfile $VENV" \
+--tab --title "terminal" -e "bash --rcfile $VENV"

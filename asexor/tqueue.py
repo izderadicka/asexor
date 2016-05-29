@@ -1,0 +1,60 @@
+import asyncio
+import uuid
+from collections import namedtuple
+from asexor.task import get_task
+from multiprocessing import cpu_count
+import logging
+
+logger = logging.getLogger('tqueue')
+
+MAX_PRIORITY = 0
+MIN_PRIORITY = 9
+NORMAL_PRIORITY = 4
+
+
+TaskInfo = namedtuple(
+    'TaskInfo', ['id', 'task', 'args', 'kwargs', 'user'])
+
+
+class TasksQueue():
+
+    def __init__(self, session, concurrent=None, queue_size=0):
+        self._q = asyncio.PriorityQueue(maxsize=queue_size)
+        self._session = session
+        self._running = True
+        if not concurrent:
+            concurrent = cpu_count()
+        self._cc_semaphore = asyncio.Semaphore(concurrent)
+
+    def add_task(self, task_name, task_user, task_args=(), task_kwargs={}, task_priority=NORMAL_PRIORITY):
+        task = get_task(task_name)()
+        task_id = uuid.uuid4().hex
+        asyncio.ensure_future(self._q.put((task_priority,
+                                        TaskInfo(task_id, task, task_args, task_kwargs, task_user))))
+        return task_id
+
+    def stop(self):
+        self._running = False
+        
+    async def join(self):
+        await self._q.join()
+
+    async def run_tasks(self):
+        while self._running:
+            await self._cc_semaphore.acquire()
+            _priority, task = await self._q.get()
+            # notify task start
+            self._session.notify_start(task.id, task.user)
+            asyncio.ensure_future(self.run_one(task))
+
+    async def run_one(self, task):
+        try:
+            res = await task.task.run(*task.args, **task.kwargs)
+            self._session.notify_success(task.id, task.user, res, task.task.duration)
+        except Exception as e:
+            logger.exception('Task %s(%s, %s) id %s failed with %s',
+                         task.task.NAME, task.args, task.kwargs, task.id, e)
+            self._session.notify_error(task.id, task.user, e, task.task.duration)
+        finally:
+            self._q.task_done()
+            self._cc_semaphore.release()
