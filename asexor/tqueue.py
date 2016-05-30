@@ -3,14 +3,10 @@ import uuid
 from collections import namedtuple
 from asexor.task import get_task
 from multiprocessing import cpu_count
+from asexor.config import NORMAL_PRIORITY
 import logging
 
 logger = logging.getLogger('tqueue')
-
-MAX_PRIORITY = 0
-MIN_PRIORITY = 9
-NORMAL_PRIORITY = 4
-
 
 TaskInfo = namedtuple(
     'TaskInfo', ['id', 'task', 'args', 'kwargs', 'user'])

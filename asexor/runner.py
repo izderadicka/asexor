@@ -4,8 +4,7 @@ import signal
 from six.moves.urllib.parse import urlparse
 from autobahn.wamp.types import ComponentConfig
 from autobahn.asyncio.rawsocket import WampRawSocketClientFactory
-import txaio
-
+import logging
 
 # TODO - unify with previous class
 class ApplicationRunnerRawSocket(object):
@@ -16,7 +15,7 @@ class ApplicationRunnerRawSocket(object):
     It can host a WAMP application component in a WAMP-over-WebSocket client
     connecting to a WAMP router.
     """
-    log=txaio.make_logger()
+    log=logging.getLogger('runner')
     def __init__(self, url, realm, extra=None, serializer=None):
         """
         :param url: Raw socket unicode - either path on local server to unix socket (or unix:/path)
@@ -54,7 +53,7 @@ class ApplicationRunnerRawSocket(object):
             try:
                 session = make(cfg)
             except Exception:
-                self.log.failure("App session could not be created! ")
+                self.log.exception("App session could not be created! ")
                 asyncio.get_event_loop().stop()
             else:
                 return session
@@ -73,10 +72,9 @@ class ApplicationRunnerRawSocket(object):
         transport_factory = WampRawSocketClientFactory(create, serializer=self.serializer)
 
         loop = asyncio.get_event_loop()
+        logging.basicConfig(level=logging.DEBUG if logging_level == 'debug' else logging.INFO)
         if logging_level == 'debug':
             loop.set_debug(True)
-        txaio.use_asyncio()
-        txaio.config.loop = loop
 
         try:
             loop.add_signal_handler(signal.SIGTERM, loop.stop)
@@ -85,28 +83,33 @@ class ApplicationRunnerRawSocket(object):
             pass
 
         def handle_error(loop, context):
-            self.log.error('Application Error: {err}', err=context)
+            self.log.error('Application Error: %s', context)
+            if 'exception' in context and context['exception']:
+                import traceback
+                e = context['exception']
+                tb='\n'.join(traceback.format_tb(e.__traceback__)) if hasattr(e, '__traceback__') else ''
+                logging.error('Exception : %s \n %s', repr(e), tb)
             loop.stop()
 
         loop.set_exception_handler(handle_error)
-
-        if is_unix:
-            coro = loop.create_unix_connection(transport_factory, parsed_url.path)
-        else:
-            coro = loop.create_connection(transport_factory, parsed_url.hostname, parsed_url.port)
-        (_transport, protocol) = loop.run_until_complete(coro)
-
-        txaio.start_logging(level=logging_level)  # @UndefinedVariable
-
+        
         try:
-            loop.run_forever()
-        except KeyboardInterrupt:
-            pass
-        self.log.debug('Left main loop waiting for completion')
-        # give Goodbye message a chance to go through, if we still
-        # have an active session
-        # it's not working now - because protocol is_closed must return Future
-        if protocol._session:
-            loop.run_until_complete(protocol._session.leave())
-
-        loop.close()
+            if is_unix:
+                coro = loop.create_unix_connection(transport_factory, parsed_url.path)
+            else:
+                coro = loop.create_connection(transport_factory, parsed_url.hostname, parsed_url.port)
+            (_transport, protocol) = loop.run_until_complete(coro)
+    
+    
+            try:
+                loop.run_forever()
+            except KeyboardInterrupt:
+                pass
+            self.log.debug('Left main loop waiting for completion')
+            # give Goodbye message a chance to go through, if we still
+            # have an active session
+            # it's not working now - because protocol is_closed must return Future
+            if protocol._session:
+                loop.run_until_complete(protocol._session.leave())
+        finally:
+            loop.close()

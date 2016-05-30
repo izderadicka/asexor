@@ -8,4 +8,6 @@ is based on two relatively new technologies -  [Python Asyncio](https://docs.pyt
 
 So it's well suited for running tasks for web based applications (for instance file conversions). 
 
+Python 3.5 only (due to new async and await keywords).
+
 NOW  IN EARLY STAGES OF DEVELOPMENT

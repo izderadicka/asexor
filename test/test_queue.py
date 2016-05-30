@@ -1,7 +1,8 @@
 import asyncio
 from unittest.mock import Mock
 from test_tasks import BaseTest
-from asexor.tqueue import TasksQueue, MAX_PRIORITY
+from asexor.tqueue import TasksQueue
+from asexor.config import MAX_PRIORITY
 import time
 import math
 
