@@ -30,6 +30,7 @@ class TasksQueue():
             # we need to assure that task_id from run_task is sent before first update
             # this is a hack - need to find a better way 
             await asyncio.sleep(0.1)
+            # for security reason consider sync version of put and throw error when q is full
             await self._q.put((task_priority, TaskInfo(task_id, task, task_args, task_kwargs, task_user)))
         loop.create_task(_add())
         return task_id
