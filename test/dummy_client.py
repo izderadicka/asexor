@@ -1,15 +1,13 @@
 import asyncio
-import sys
 import logging
 import argparse
 import random
 from autobahn.asyncio.wamp import ApplicationSession
-from runner import ApplicationRunnerRawSocket
-from autobahn.wamp import ApplicationError
+from asexor.runner import ApplicationRunnerRawSocket
 from asexor.config import Config
 from collections import defaultdict, deque
 
-log = logging.getLogger('frontend')
+log = logging.getLogger('dummy_client')
 
 TASKS = [('date', ('%d-%m-%Y %H:%M %Z',), {'utc': True}),
          ('sleep', (0.1,), {})

@@ -6,20 +6,31 @@ Asexor = Asynchronous Executor
 - Runs any configured program and returns results  
 - task preprocess and post process as coroutiness
 - params arguments positional and named
-- Integrated with authentication / authorization - configurable
+- Integrated with authentication / authorization - configurable (via crossbar router)
 - Priority of tasks connected with users roles - configurable
 - Maximum number of concurrent processes
 - Process timeout
 - Parsing process results from stdout
 - Configurable tasks - processes
 - Tasks queue - maximum number of tasks
+- publish task progress -  started, done (with result)
+- Configuration
+- KISS
+
+Maybe in future
+---------------
 - Cancel tasks from queue?
-- publish task progress -  started, done (with result), ?queue position?
+- tasks batches 
+	- list of tasks 
+	- reports -batch progress ( done x of y) on top of tasks update
+- report task progress on bases of parsing stdout continuously 
 - query
   - task status,  all my tasks ...
   - general server status - number of tasks - statistics etc.
-- Configuration
-- KISS
+
+Limitations
+-----------
+- No persistency - tasks lost if restarted
 
 Message flow
 ------------

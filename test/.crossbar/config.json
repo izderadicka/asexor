@@ -30,23 +30,7 @@
                         
                         {
                             "name": "user",
-                            "permissions": [
-                                {
-                                    "uri": "eu.zderadicka.asexor",
-                                    "match": "prefix",
-                                    "allow": {
-                                        "call": true,
-                                        "register": false,
-                                        "publish": false,
-                                        "subscribe": true
-                                    },
-                                    "disclose": {
-                                        "caller": true,
-                                        "publisher": true
-                                    },
-                                    "cache": true
-                                }
-                            ]
+                            "authorizer": "eu.zderadicka.dummy_authorize"
                         }
                         
                         
@@ -81,10 +65,31 @@
                 	"auth": {
                         "ticket": {
                             "type": "dynamic",
-                            "authenticator": "eu.zderadicka.dummy_auth"
+                            "authenticator": "eu.zderadicka.dummy_authenticate"
                         }
                     }
-                }           
+                },
+                {
+                    "type": "web",
+                    "endpoint": {
+                        "type": "tcp",
+                        "port": 8880
+                    },
+                    "paths": {
+                        
+                        "ws": {
+                            "type": "websocket",
+                            "auth": {
+                                "ticket": {
+                                    "type": "dynamic",
+                                    "authenticator": "eu.zderadicka.dummy_authenticate"
+                                }
+                            }
+                        }
+                    }   
+                       
+                }
+                
             ]
         }
     ]

@@ -13,19 +13,16 @@ from asexor.task import load_tasks_from
 log = logging.getLogger('backend')
 
 
-def dummy_authenticate(realm, user_id, details):
-    log.debug('Authenticating user %s', user_id)
-    return 'user'
-
-
 class SessionAdapter():
 
     def __init__(self, session):
         self._session = session
 
     def _options(self, task_user):
-        if Config.LIMIT_PUBLISH_BY == 'SESSION':
+        if Config.LIMIT_PUBLISH_BY == 'SESSION' and task_user:
             return PublishOptions(eligible=[task_user])
+        elif not Config.LIMIT_PUBLISH_BY:
+            return None
 
         raise ConfigError('Invalid configuration for LIMIT_PUBLISH_BY')
 
@@ -50,7 +47,11 @@ class Executor(ApplicationSession):
 
     async def onJoin(self, details):
         log.info('started session with details %s', details)
-        self.register(dummy_authenticate, 'eu.zderadicka.dummy_auth')
+        if Config.AUTHENTICATION_PROCEDUTE and Config.AUTHENTICATION_PROCEDURE_NAME:
+            self.register(Config.AUTHENTICATION_PROCEDUTE, Config.AUTHENTICATION_PROCEDURE_NAME)
+        if Config.AUTHORIZATION_PROCEDUTE and Config.AUTHORIZATION_PROCEDURE_NAME:
+            self.register(Config.AUTHORIZATION_PROCEDUTE, Config.AUTHORIZATION_PROCEDURE_NAME)
+            
         self.tasks = TasksQueue(SessionAdapter(self),
                                 concurrent=Config.CONCURRENT_TASKS,
                                 queue_size=Config.TASKS_QUEUE_MAX_SIZE)
@@ -83,24 +84,3 @@ class Executor(ApplicationSession):
     def onDisconnect(self):
         log.warn('Disconnected')
         asyncio.get_event_loop().stop()
-
-if __name__ == '__main__':
-    import argparse
-
-    # for testing
-    load_tasks_from(
-        'simple_tasks', os.path.join(os.path.dirname(__file__), '../test/tasks'))
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-d', '--debug', action='store_true', help='enable debug')
-    opts = parser.parse_args()
-    level = 'info'
-    if opts.debug:
-        level = 'debug'
-    path = os.path.join(os.path.dirname(__file__), '.crossbar/socket1')
-    runner = ApplicationRunnerRawSocket(
-        path,
-        u"realm1",
-    )
-    runner.run(Executor, logging_level=level)
