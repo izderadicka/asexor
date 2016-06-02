@@ -25,8 +25,13 @@ class TasksQueue():
     def add_task(self, task_name, task_user, task_args=(), task_kwargs={}, task_priority=NORMAL_PRIORITY):
         task = get_task(task_name)()
         task_id = uuid.uuid4().hex
-        asyncio.ensure_future(self._q.put((task_priority,
-                                        TaskInfo(task_id, task, task_args, task_kwargs, task_user))))
+        loop = asyncio.get_event_loop()
+        async def _add():
+            # we need to assure that task_id from run_task is sent before first update
+            # this is a hack - need to find a better way 
+            await asyncio.sleep(0.1)
+            await self._q.put((task_priority, TaskInfo(task_id, task, task_args, task_kwargs, task_user)))
+        loop.create_task(_add())
         return task_id
 
     def stop(self):

@@ -75,7 +75,7 @@ class MyClient(ApplicationSession):
 
         def log_updates(task_id, status=None, **kwargs):
             # first update any pending updates
-            self._process_pending()
+            # self._process_pending()
             log.info(
                 'Update for task %s, status = %s, details= %s', task_id, status, kwargs)
             if task_id in self._tasks_table:
@@ -90,11 +90,11 @@ class MyClient(ApplicationSession):
             task_name, args, kwargs = random.choice(TASKS)
             task_id = await self.call(Config.RUN_TASK_PROC, task_name, *args, **kwargs)
             log.info('Task submitted with id=%s', task_id)
-            self._tasks_table[task_id]['status'] = 'send'
+            self._tasks_table[task_id]['status'] = 'sent'
 
         # in case notification came before task result (possible due to async
         # sheduling
-        self._process_pending()
+        # self._process_pending()
         self._check_done()
 
 

@@ -10,7 +10,20 @@
     .results-section {
     margin-top: 3em;
     }
-  </style>
+
+    .status {
+      font-weight: bold;
+    }
+
+    .status.success {
+      color: green;
+    }
+
+    .status.error {
+      color:red;
+    }
+
+    </style>
 </head>
 <body>
   <div class="container">
@@ -53,7 +66,7 @@
 <div class="results-section">
   <table class="table">
     <thead>
-    <tr><th>Task ID</th><th>Task Type</th><th>Status</th><th>Result</th></tr>
+    <tr><th>Task ID</th><th>Task Type</th><th>Status</th><th>Duration</th><th>Result</th></tr>
   </thead>
     <tbody id="results">
     </tbody>
@@ -86,9 +99,9 @@ $(function() {
   let task_updated = function (args, kwargs, details) {
     console.log('Task update', args, kwargs, details);
     let task_id=args[0];
-    if tasksStatus.has(task_id) {
+    if (tasksStatus.has(task_id)) {
       let s = tasksStatus.get(task_id);
-      s.status = kwargs.status;
+      Object.assign(s, kwargs);
       s.result = kwargs.error? kwargs.error : kwargs.result;
       show_results()
     } else {
@@ -111,7 +124,8 @@ $(function() {
       row=$('<tr>');
       $('<td>').text(task_id).appendTo(row);
       $('<td>').text(status.task).appendTo(row);
-      $('<td>').text(status.status).appendTo(row);
+      $('<td>').append($('<span>').addClass('status '+status.status).text(status.status)).appendTo(row);
+      $('<td>').text(status.duration || '').appendTo(row);
       $('<td>').text(status.result).appendTo(row);
       root.append(row);
     }
