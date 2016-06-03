@@ -48,11 +48,11 @@ class TestTasks(BaseTest):
         date = get_task('date')()
         self.assertTrue(date)
         loop = asyncio.get_event_loop()
-        args, kwargs = loop.run_until_complete(
+        args = loop.run_until_complete(
             date.validate_args('%d-%m-%Y %H:%M %Z', utc=True))
-        self.assertEqual(args[0], '+%d-%m-%Y %H:%M %Z')
+        self.assertEqual(args[1], '+%d-%m-%Y %H:%M %Z')
 
-        res = loop.run_until_complete(date.execute(*args, **kwargs))
+        res = loop.run_until_complete(date.execute(*args))
         res = loop.run_until_complete(date.parse_result(res))
         self.assertTrue(res.endswith('UTC'))
         self.assertTrue(date.duration > 0)
@@ -63,10 +63,10 @@ class TestTasks(BaseTest):
     def test_task_sleep(self):
         sleep = get_task('sleep')()
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(sleep.execute(1))
+        loop.run_until_complete(sleep.execute('1'))
         self.assertTrue(sleep.duration > 1)
 
         sleep2 = sleep = get_task('sleep')(max_time=1)
         with self.assertRaises(TimeoutError):
-            loop.run_until_complete(sleep2.execute(2))
+            loop.run_until_complete(sleep2.execute('2'))
         self.assertTrue(sleep.duration < 1.1)

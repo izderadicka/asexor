@@ -113,9 +113,6 @@ class BaseTask():
         self.duration = None
 
     async def validate_args(self, *args, **kwargs):
-        return args, kwargs
-
-    async def execute(self, *args, **kwargs):
         def substitute_args():
             def arg_val(x):
                 if isinstance(x, Arg):
@@ -131,8 +128,12 @@ class BaseTask():
                     l.append(item)
                 return l
             return reduce(flatten, l, [])
+        return substitute_args()
+
+    async def execute(self, *args):
+        
         start = time.time()
-        proc = await asyncio.create_subprocess_exec(self.COMMAND, *substitute_args(),
+        proc = await asyncio.create_subprocess_exec(self.COMMAND, *args,
                                                     stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         wait_times = list(filter(None, [self.max_time, self.MAX_TIME]))
         wait_time = min(wait_times) if wait_times else None
@@ -141,7 +142,7 @@ class BaseTask():
 
         except asyncio.TimeoutError:
             logger.error('Task %s with args %s pid %d timeout after %f', self.NAME,
-                         (args, kwargs), proc.pid, wait_time)
+                         args, proc.pid, wait_time)
             try:
                 proc.terminate()
             except ProcessLookupError:
@@ -169,6 +170,6 @@ class BaseTask():
         return None
 
     async def run(self, *args, **kwargs):
-        args, kwargs = await self.validate_args(*args, **kwargs)
-        res = await self.execute(*args, **kwargs)
+        args = await self.validate_args(*args, **kwargs)
+        res = await self.execute(*args)
         return await self.parse_result(res)

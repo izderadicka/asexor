@@ -19,7 +19,7 @@ class TestQueue(BaseTest):
 
         asyncio.ensure_future(q.run_tasks())
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(q.join())
+        loop.run_until_complete(q.join(0.1))
 
         self.assertEqual(session.notify_start.call_count, 10)
         self.assertEqual(session.notify_success.call_count, 10)
@@ -36,11 +36,11 @@ class TestQueue(BaseTest):
         asyncio.ensure_future(q.run_tasks())
         loop = asyncio.get_event_loop()
         start = time.time()
-        loop.run_until_complete(q.join())
+        loop.run_until_complete(q.join(0.1))
         duration = time.time() - start
 
         self.assertTrue(
-            abs(duration - 3) < 0.1, 'Should take app 3 secs, but took %f' % duration)
+            abs(duration - 3.1) < 0.1, 'Should take app 3.1 secs, but took %f' % duration)
 
         self.assertEqual(session.notify_start.call_count, 12)
         self.assertEqual(session.notify_success.call_count, 12)
@@ -56,7 +56,7 @@ class TestQueue(BaseTest):
         q.add_task('sleep', 'speedy', (0.8,), task_priority=MAX_PRIORITY)
         asyncio.ensure_future(q.run_tasks())
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(q.join())
+        loop.run_until_complete(q.join(0.1))
 
         self.assertEqual(session.notify_start.call_count, 7)
         self.assertEqual(session.notify_success.call_count, 7)
@@ -74,7 +74,7 @@ class TestQueue(BaseTest):
         q.add_task('sleep', 'ivan', ('a',))
         asyncio.ensure_future(q.run_tasks())
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(q.join())
+        loop.run_until_complete(q.join(0.1))
         self.assertFalse(session.notify_success.called)
         self.assertTrue(session.notify_error.called)
         

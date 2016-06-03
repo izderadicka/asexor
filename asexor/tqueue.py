@@ -37,8 +37,10 @@ class TasksQueue():
 
     def stop(self):
         self._running = False
-        
-    async def join(self):
+
+    async def join(self, initial_wait=None):
+        if initial_wait:
+            await asyncio.sleep(initial_wait)
         await self._q.join()
 
     async def run_tasks(self):
