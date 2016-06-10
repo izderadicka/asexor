@@ -42,7 +42,7 @@ if __name__ == '__main__':
     Config.AUTHENTICATION_PROCEDUTE = dummy_authenticate
     Config.AUTHENTICATION_PROCEDURE_NAME = "eu.zderadicka.dummy_authenticate"
 
-    Config.AUTHORIZATION_PROCEDUTE = dummy_authorize
+    Config.AUTHORIZATION_PROCEDURE = dummy_authorize
     Config.AUTHORIZATION_PROCEDURE_NAME = "eu.zderadicka.dummy_authorize"
 
     path = os.path.join(os.path.dirname(__file__), '.crossbar/socket1')

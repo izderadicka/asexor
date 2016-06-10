@@ -3,6 +3,7 @@ import logging
 import re
 import sys
 import time
+from inspect import isclass
 from functools import reduce
 from importlib import import_module
 
@@ -28,7 +29,7 @@ def load_tasks_from(module, extra_path=None):
     names = dir(m)
     for name in names:
         cls = getattr(m, name)
-        if re.match('[A-Z]', name) and cls is not BaseTask and issubclass(cls, BaseTask):
+        if re.match('[A-Z]', name) and isclass(cls) and cls is not BaseTask and issubclass(cls, BaseTask):
             register(cls)
 
 

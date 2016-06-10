@@ -49,8 +49,8 @@ class Executor(ApplicationSession):
         log.info('started session with details %s', details)
         if Config.AUTHENTICATION_PROCEDUTE and Config.AUTHENTICATION_PROCEDURE_NAME:
             self.register(Config.AUTHENTICATION_PROCEDUTE, Config.AUTHENTICATION_PROCEDURE_NAME)
-        if Config.AUTHORIZATION_PROCEDUTE and Config.AUTHORIZATION_PROCEDURE_NAME:
-            self.register(Config.AUTHORIZATION_PROCEDUTE, Config.AUTHORIZATION_PROCEDURE_NAME)
+        if Config.AUTHORIZATION_PROCEDURE and Config.AUTHORIZATION_PROCEDURE_NAME:
+            self.register(Config.AUTHORIZATION_PROCEDURE, Config.AUTHORIZATION_PROCEDURE_NAME)
             
         self.tasks = TasksQueue(SessionAdapter(self),
                                 concurrent=Config.CONCURRENT_TASKS,
@@ -64,6 +64,7 @@ class Executor(ApplicationSession):
                 raise RuntimeError('Call details not available')
             task_user = details.caller if Config.LIMIT_PUBLISH_BY == "SESSION" else None
             role = details.caller_authrole
+            authid = details.caller_authid
             task_priority = Config.DEFAULT_PRIORITY
             if role:
                 task_priority = Config.PRIORITY_MAP.get(
