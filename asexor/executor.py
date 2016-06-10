@@ -70,7 +70,7 @@ class Executor(ApplicationSession):
                 task_priority = Config.PRIORITY_MAP.get(
                     role, Config.DEFAULT_PRIORITY)
             task_id = self.tasks.add_task(
-                task_name, task_user, args, kwargs, task_priority)
+                task_name, task_user, args, kwargs, task_priority, authenticated_user=authid)
             return task_id
         self.register(run_task, Config.RUN_TASK_PROC, RegisterOptions(
             details_arg='__call_details__'))

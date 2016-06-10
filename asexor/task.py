@@ -108,10 +108,11 @@ class BaseTask():
     ARGS = []
     MAX_TIME = None
 
-    def __init__(self, output_encoding='UTF-8', max_time=None):
+    def __init__(self, user=None, output_encoding='UTF-8', max_time=None):
         self.output_encoding = output_encoding
         self.max_time = max_time
         self.duration = None
+        self.user = user
 
     async def validate_args(self, *args, **kwargs):
         def substitute_args():

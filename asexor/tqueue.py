@@ -22,8 +22,9 @@ class TasksQueue():
             concurrent = cpu_count()
         self._cc_semaphore = asyncio.Semaphore(concurrent)
 
-    def add_task(self, task_name, task_user, task_args=(), task_kwargs={}, task_priority=NORMAL_PRIORITY):
-        task = get_task(task_name)()
+    def add_task(self, task_name, task_user, task_args=(), task_kwargs={}, 
+                 task_priority=NORMAL_PRIORITY, authenticated_user=None):
+        task = get_task(task_name)(user=authenticated_user)
         task_id = uuid.uuid4().hex
         loop = asyncio.get_event_loop()
         async def _add():
