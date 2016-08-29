@@ -165,7 +165,7 @@ class BaseTask():
         assert ret_code is not None
         if ret_code != 0:
             raise TaskError('Command "%s %s" failed with return code %d' % (self.COMMAND,
-                                                                            ' '.join(substitute_args()), ret_code))
+                                                                            args, ret_code))
         return output
 
     async def parse_result(self, data):
