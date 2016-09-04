@@ -133,7 +133,7 @@ class BaseTask():
         return substitute_args()
 
     async def execute(self, *args):
-        
+        logger.debug('Running task %s command %s with params %s', self.NAME, self.COMMAND, args)
         start = time.time()
         proc = await asyncio.create_subprocess_exec(self.COMMAND, *args,
                                                     stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
@@ -156,7 +156,8 @@ class BaseTask():
                     proc.kill()
                 except ProcessLookupError:
                     pass
-                logger.warn('Has to kill process %d', proc.pid)
+                else:
+                    logger.warn('Has to kill process %d', proc.pid)
             raise TimeoutError('Timeout after %f' % wait_time)
         finally:
             self.duration = time.time() - start
@@ -164,8 +165,8 @@ class BaseTask():
         # process should finish now
         assert ret_code is not None
         if ret_code != 0:
-            raise TaskError('Command "%s %s" failed with return code %d' % (self.COMMAND,
-                                                                            args, ret_code))
+            raise TaskError('Command "%s %s" failed with return code %d\nOutput: %s\nError Output: %s' % (self.COMMAND,
+                                                                            args, ret_code, output, error))
         return output
 
     async def parse_result(self, data):
