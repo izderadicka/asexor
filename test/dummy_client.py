@@ -38,7 +38,7 @@ class MyClient(ApplicationSession):
     def _on_done(self, r):
         log.info('All tasks (%d) are finished', len(self._tasks_table))
         has_error = any(
-            map(lambda v: v['status'] == 'errdetails=or', self._tasks_table.values()))
+            map(lambda v: v['status'] == 'error', self._tasks_table.values()))
         if has_error:
             log.error('Some tasks have error')
         asyncio.get_event_loop().stop()
