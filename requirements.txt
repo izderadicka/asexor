@@ -1,2 +1,2 @@
-git+https://github.com/crossbario/autobahn-python.git
+autobahn>=0.14.1
 crossbar>=0.14.0
