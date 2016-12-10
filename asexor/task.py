@@ -6,6 +6,7 @@ import time
 from inspect import isclass
 from functools import reduce
 from importlib import import_module
+from collections import namedtuple
 
 
 logger = logging.getLogger('task')
@@ -29,7 +30,7 @@ def load_tasks_from(module, extra_path=None):
     names = dir(m)
     for name in names:
         cls = getattr(m, name)
-        if re.match('[A-Z]', name) and isclass(cls) and cls is not BaseTask and issubclass(cls, BaseTask):
+        if re.match('[A-Z]', name) and isclass(cls) and cls not in (BaseTask, BaseSimpleTask, BaseMultiTask) and issubclass(cls, BaseTask):
             register(cls)
 
 
@@ -101,18 +102,46 @@ class TimeoutError(TaskError):
 class NoSuchTask(TaskError):
     pass
 
-
 class BaseTask():
     NAME = ''
+    
+    def __init__(self, user):
+        self.user = user
+        self.duration = None
+        
+TaskDetails = namedtuple('TaskDetails', ('task_name', 'task_args', 'task_kwargs', 
+                                         'task_no', 'total_tasks'))
+
+class BaseMultiTask(BaseTask):
+    
+    def __init__(self, user=None):
+        super(BaseMultiTask, self).__init__(user)
+    
+    async def start(self, *args, **kwargs):
+        ''' Initialize multi task with arguments '''
+        raise NotImplementedError()
+    
+    async def next_task(self):
+        '''Returns next simple task info'''
+        raise NotImplementedError()
+    
+    async def update_task_result(self, task_no, result=None, error=None, on_all_finished=None):
+        '''Gets result form subtask'''
+        raise NotImplementedError()
+    
+    
+    
+
+class BaseSimpleTask(BaseTask):
     COMMAND = ''
     ARGS = []
     MAX_TIME = None
 
     def __init__(self, user=None, output_encoding='UTF-8', max_time=None):
+        super(BaseSimpleTask, self).__init__(user)
         self.output_encoding = output_encoding
         self.max_time = max_time
-        self.duration = None
-        self.user = user
+        
 
     async def validate_args(self, *args, **kwargs):
         def substitute_args():

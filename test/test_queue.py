@@ -78,6 +78,32 @@ class TestQueue(BaseTest):
         self.assertFalse(session.notify_success.called)
         self.assertTrue(session.notify_error.called)
         
+    
+    def test_multi(self):
+        session = Mock()
+        session.notify_error = Mock(
+            side_effect=lambda *args, **kwargs: print('Error: %s %s' % (args, kwargs)))
+        loop = asyncio.get_event_loop()
+        run = loop.run_until_complete
+        q = TasksQueue(session)
+        task_id=q.add_task('multi', 'ivan', (['date', 'sleep', 'date'], [(['%d-%m-%Y %H:%M %Z'], {'utc':True}), ([1], {}), 
+                                                (['%d-%m-%Y %H:%M %Z'], {'utc':False}),]))
+        asyncio.ensure_future(q.run_tasks())
+        loop.run_until_complete(q.join(1.1))
+        session.notify_error.assert_not_called()
+        
+        self.assertEqual(session.notify_success.call_count, 1)
+        args = session.notify_success.call_args[0]
+        self.assertEqual(args[0], task_id)
+        self.assertEqual(args[1], 'ivan')
+        self.assertEqual(len(args[2]), 3)
+        self.assertEqual(len(args[2][0]), 20)
+        self.assertEqual(args[2][0][-3:], 'UTC')
+        self.assertEqual(len(args[2][2]), 20)
+        self.assertTrue(args[2][1] is None)
+        
+        
+        
         
         
         
