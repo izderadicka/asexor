@@ -118,16 +118,38 @@ class BaseMultiTask(BaseTask):
         super(BaseMultiTask, self).__init__(user)
     
     async def start(self, *args, **kwargs):
-        ''' Initialize multi task with arguments '''
-        raise NotImplementedError()
-    
+        self.register_tasks(args[0], args[1])
+        self._start_time = time.time()
+        
+        
+    def register_tasks(self, tasks, tasks_args):
+        self.tasks = tasks
+        self.tasks_args = tasks_args
+        if (len(self.tasks) != len(self.tasks_args)):
+            raise ArgumentError('For each tasks there must be arguments tuple ')
+        self.count =0
+        self.done = 0
+        self.tasks_results = [None] * len(self.tasks)
+        
+       
     async def next_task(self):
-        '''Returns next simple task info'''
-        raise NotImplementedError()
+        if self.count>= len(self.tasks):
+            return None
+        td=TaskDetails(task_name=self.tasks[self.count],
+                       task_args=self.tasks_args[self.count][0],
+                       task_kwargs=self.tasks_args[self.count][1],
+                       task_no = self.count,
+                       total_tasks = len(self.tasks)
+                       )
+        self.count+=1
+        return td
     
     async def update_task_result(self, task_no, result=None, error=None, on_all_finished=None):
-        '''Gets result form subtask'''
-        raise NotImplementedError()
+        self.tasks_results[task_no] = result
+        self.done += 1
+        if self.done == len(self.tasks) and on_all_finished:
+            self.duration =  time.time() - self._start_time
+            on_all_finished({'results':self.tasks_results, 'duration': self.duration})
     
     
     

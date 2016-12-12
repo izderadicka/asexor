@@ -96,11 +96,14 @@ class TestQueue(BaseTest):
         args = session.notify_success.call_args[0]
         self.assertEqual(args[0], task_id)
         self.assertEqual(args[1], 'ivan')
-        self.assertEqual(len(args[2]), 3)
-        self.assertEqual(len(args[2][0]), 20)
-        self.assertEqual(args[2][0][-3:], 'UTC')
-        self.assertEqual(len(args[2][2]), 20)
-        self.assertTrue(args[2][1] is None)
+        results = args[2]['results']
+        self.assertEqual(len(results), 3)
+        self.assertEqual(len(results[0]), 20)
+        self.assertEqual(results[0][-3:], 'UTC')
+        self.assertEqual(len(results[2]), 20)
+        self.assertTrue(results[1] is None)
+        duration = args[2]['duration']
+        self.assertTrue(duration > 1)
         
         
         

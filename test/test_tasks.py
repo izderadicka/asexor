@@ -100,7 +100,9 @@ class TestTasks(BaseTest):
         self.assertEqual(t.task_kwargs, {'utc':False})
         
         run(m.update_task_result(2, result=2, on_all_finished=cb))
-        cb.assert_called_once_with([0,1,2])
+        self.assertEqual(cb.call_count, 1)
+        self.assertEqual(cb.call_args[0][0]['results'], [0,1,2])
+        self.assertTrue(cb.call_args[0][0]['duration']>0 )
         
         t = run(m.next_task())
         self.assertTrue(t is None)
