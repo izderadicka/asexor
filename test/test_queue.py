@@ -93,6 +93,10 @@ class TestQueue(BaseTest):
         session.notify_error.assert_not_called()
         
         self.assertEqual(session.notify_success.call_count, 1)
+        self.assertEqual(session.notify_progress.call_count, 3)
+        for expected, received in zip([0.333, 0.666, 1.0],
+                                      map(lambda c: c[0][2],session.notify_progress.call_args_list)):
+            self.assertAlmostEqual(received, expected, 2)
         args = session.notify_success.call_args[0]
         self.assertEqual(args[0], task_id)
         self.assertEqual(args[1], 'ivan')
@@ -104,6 +108,20 @@ class TestQueue(BaseTest):
         self.assertTrue(results[1] is None)
         duration = args[2]['duration']
         self.assertTrue(duration > 1)
+        
+    def test_multi_empty(self):
+        session = Mock()
+        session.notify_error = Mock(
+            side_effect=lambda *args, **kwargs: print('Error: %s %s' % (args, kwargs)))
+        loop = asyncio.get_event_loop()
+        run = loop.run_until_complete
+        q = TasksQueue(session)
+        
+        # test empty multi
+        task_id=q.add_task('multi', 'ivan', ([], []))
+        asyncio.ensure_future(q.run_tasks())
+        run(q.join(0.1))
+        self.assertEqual(session.notify_success.call_count, 1)
         
         
         

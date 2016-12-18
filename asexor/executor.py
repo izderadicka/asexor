@@ -36,6 +36,11 @@ class SessionAdapter():
         self._session.publish(Config.UPDATE_CHANNEL, task_id,
                               status='success', result=res, duration=duration, user=task_user,
                               options=self._options(task_user))
+        
+    def notify_progress(self, task_id, task_user, progress):
+        self._session.publish(Config.UPDATE_CHANNEL, task_id,
+                              status='progress', progress=progress, user=task_user,
+                              options=self._options(task_user))
 
     def notify_error(self, task_id, task_user, err, duration):
         self._session.publish(Config.UPDATE_CHANNEL, task_id,
