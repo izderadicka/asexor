@@ -23,14 +23,21 @@ Example how to use is in `test` directory. Assure you have Python 3.5 as default
 
 Custom tasks
 ------------
-Custom tasks are created as subclasses of `task.BaseTask` - you need to override:
+Custom tasks are created as subclasses of `task.BaseSimpleTask` - you need to override:
 - NAME, COMMAND, ARGS class properties
 - `validate_args` method -validates parameters from RPC call and turns them into arguments that should be passed to the command.  There is some basic support to define arguments in ARGS, but you can create them in this method from scratch.
 - `parse_result` - creates RPC return value - either by parsing output of the command or by other method.
+- if task is to do something more complex, then just run some other program as subprocess, you can overide `execute` method and do whatever is required 
 
 Before custom tasks can be used they have to be registered by `task.load_tasks_form` function, which load all tasks from given module name. ( or `task.register` to register single task).
 
 For simple examples of tasks look at `test/tasks/simple_tasks.py`.
+
+Multitasks
+----------
+You can create a task that creates multiple simple tasks, which will be scheduled subsequently 
+(next task is scheduled after previous task is finished).
+Check `task.BaseMultiTask` class (which takes list of task names and their arguments as input)
 
 
 
