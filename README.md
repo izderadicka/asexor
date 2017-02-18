@@ -16,10 +16,12 @@ Example how to use is in `test` directory. Assure you have Python 3.5 as default
 1. install requirements `pip install -r requirements.txt`
 2. cd to `test` directory
 3. run `crossbar start`
-4. run `python dummy_server.py`
+4. run `PYTHONPATH=.. python wamp_server.py`
 5. open `dummy_client.html` in recent modern browser (FF, Chrome).
 6. Select task and run 
-7. try also python client `python dummy_client -n 10  user_name`
+7. try also python client `PYTHONPATH=.. python wamp_client.py -n 10  user_name`
+
+for more tests, demos look at README file in test directory.
 
 Custom tasks
 ------------

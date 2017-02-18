@@ -1,26 +1,22 @@
-import sys
 import asyncio
-from datetime import datetime
-import os.path
 import logging
 from autobahn.asyncio.wamp import ApplicationSession
 from autobahn.wamp.types import PublishOptions, RegisterOptions
-from asexor.runner import ApplicationRunnerRawSocket
-from asexor.tqueue import TasksQueue, NORMAL_PRIORITY
+from asexor.tqueue import TasksQueue, NORMAL_PRIORITY, AbstractSessionAdapter
 from asexor.config import Config, ConfigError
-from asexor.task import load_tasks_from
-
-log = logging.getLogger('backend')
 
 
-class SessionAdapter():
+log = logging.getLogger('wamp_backend')
+
+
+class SessionAdapter(AbstractSessionAdapter):
 
     def __init__(self, session):
         self._session = session
 
-    def _options(self, task_user):
-        if Config.LIMIT_PUBLISH_BY == 'SESSION' and task_user:
-            return PublishOptions(eligible=[task_user])
+    def _options(self, task_context):
+        if Config.LIMIT_PUBLISH_BY == 'SESSION' and task_context and task_context.caller:
+            return PublishOptions(eligible=[task_context.caller])
         elif not Config.LIMIT_PUBLISH_BY:
             return None
 
@@ -28,27 +24,27 @@ class SessionAdapter():
 
         # return PublishOptions(eligible_authid=[task_user]
 
-    def notify_start(self, task_id, task_user):
-        self._session.publish(Config.UPDATE_CHANNEL, task_id, status='started', user=task_user,
-                              options=self._options(task_user))
+    def notify_start(self, task_id, task_context=None):
+        self._session.publish(Config.UPDATE_CHANNEL, task_id, status='started',
+                              options=self._options(task_context))
 
-    def notify_success(self, task_id, task_user, res, duration):
+    def notify_success(self, task_id, res, duration, task_context=None):
         self._session.publish(Config.UPDATE_CHANNEL, task_id,
-                              status='success', result=res, duration=duration, user=task_user,
-                              options=self._options(task_user))
+                              status='success', result=res, duration=duration,
+                              options=self._options(task_context))
         
-    def notify_progress(self, task_id, task_user, progress):
+    def notify_progress(self, task_id, progress, task_context=None):
         self._session.publish(Config.UPDATE_CHANNEL, task_id,
-                              status='progress', progress=progress, user=task_user,
-                              options=self._options(task_user))
+                              status='progress', progress=progress,
+                              options=self._options(task_context))
 
-    def notify_error(self, task_id, task_user, err, duration):
+    def notify_error(self, task_id, err, duration, task_context=None):
         self._session.publish(Config.UPDATE_CHANNEL, task_id,
-                              status='error', error=str(err) or repr(err), duration=duration, user=task_user,
-                              options=self._options(task_user))
+                              status='error', error=str(err) or repr(err), duration=duration,
+                              options=self._options(task_context))
 
 
-class Executor(ApplicationSession):
+class BackendSession(ApplicationSession):
 
     async def onJoin(self, details):
         log.info('started session with details %s', details)
@@ -67,7 +63,6 @@ class Executor(ApplicationSession):
             details = kwargs.pop('__call_details__', None)
             if not details:
                 raise RuntimeError('Call details not available')
-            task_user = details.caller if Config.LIMIT_PUBLISH_BY == "SESSION" else None
             role = details.caller_authrole
             authid = details.caller_authid
             task_priority = Config.DEFAULT_PRIORITY
@@ -75,7 +70,8 @@ class Executor(ApplicationSession):
                 task_priority = Config.PRIORITY_MAP.get(
                     role, Config.DEFAULT_PRIORITY)
             task_id = self.tasks.add_task(
-                task_name, task_user, args, kwargs, task_priority, authenticated_user=authid)
+                task_name, args, kwargs, task_priority, authenticated_user=authid, 
+                task_context=details)
             return task_id
         self.register(run_task, Config.RUN_TASK_PROC, RegisterOptions(
             details_arg='__call_details__'))

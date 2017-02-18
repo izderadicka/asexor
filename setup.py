@@ -11,7 +11,6 @@ except ImportError:
     from distutils.command.install import install
     
 pkg_file= os.path.join(os.path.split(__file__)[0], 'asexor', '__init__.py')
-cfg_file= os.path.join(os.path.split(__file__)[0], 'xapi-back.cfg.sample')
 
 m=re.search(r"__version__\s*=\s*'([\d.]+)'", open(pkg_file).read())
 if not m:
@@ -28,7 +27,10 @@ setup(name='asexor',
       packages=['asexor', ],
       author='Ivan Zderadicka',
       author_email='ivan.zderadicka@gmail.com',
-      install_requires=['autobahn>=0.14.1', 'crossbar>=0.14.0'],
+      install_requires=['autobahn>=0.14.1', 
+                        'crossbar>=0.14.0',
+                        'aiohttp>=1.3.2',
+                        ],
       provides=['asexor'],
       keywords=['asyncio', 'tasks scheduler'],
       classifiers=['Development Status :: 4 - Beta',

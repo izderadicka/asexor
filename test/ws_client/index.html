@@ -1,0 +1,83 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Test Asexor</title>
+  <style>
+    .hidden {
+      display:none;
+    }
+
+    .results-section {
+    margin-top: 3em;
+    }
+
+    .status {
+      font-weight: bold;
+    }
+
+    .status.success {
+      color: green;
+    }
+
+    .status.error {
+      color:red;
+    }
+
+    </style>
+   <script src="/jspm_packages/system.js"></script>
+  <script src="/config.js"></script>
+  <script>
+    System.import('app.js');
+  </script>
+</head>
+<body>
+  <div class="container">
+<h1>ASEXOR = ASynchronous EXecutOR</h1>
+<h2>Requirements</h2>
+  <p> Recent Browser (ES6 support - FF 45+, Chorme 51+), Linux, Python 3.5 (3.5 only!), python package aiohttp</p>
+  <p>Assure that ws_server , <br>
+    <code>python ws_server.py</code> <br>
+    is started from test directory.
+  </p>
+<h2>Test remote tasks</h2>
+<div id="task selector" class="form-group">
+  <label>Task</label>
+  <select id="task-type">
+    <option value="date">date</option>
+    <option value="sleep">sleep</option>
+  </select>
+</div>
+<div id="params">
+<div class="hidden form-group" id="date-params">
+  <label>Date format</label>
+  <select id="date-format">
+    <option value="%d-%m-%Y %H:%M %Z">DD-MM-YYYY HH:MM TZ</option>
+    <option value="%d-%b-%y">DD-Mon-YY</option>
+    <option value="%x %X">Locale representation</option>
+  </select>
+  <label>UTC Time?</label>
+  <input type="checkbox" id="date-utc">
+</div>
+<div class="hidden form-group" id="sleep-params">
+  <label>Sleep seconds</label>
+  <input type="text" value="1" id="sleep-time">
+</div>
+</div>
+
+<button class="btn btn-primary" id="run-task">Submit Task</button>
+
+<div class="results-section">
+  <table class="table">
+    <thead>
+    <tr><th>Task ID</th><th>Task Type</th><th>Status</th><th>Duration</th><th>Result</th></tr>
+  </thead>
+    <tbody id="results">
+    </tbody>
+  </table>
+
+<div>
+</div>
+</div>
+
+</body>
+</html>

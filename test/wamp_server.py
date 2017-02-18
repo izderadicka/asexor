@@ -1,12 +1,12 @@
 import os.path
 from asexor.config import Config
 from asexor.task import load_tasks_from
-from asexor.executor import Executor
-from asexor.runner import ApplicationRunnerRawSocket
+from asexor.wamp_backend import BackendSession
+from asexor.wamp_runner import ApplicationRunnerRawSocket
 import logging
 import time
 
-log = logging.getLogger('dummy_server')
+log = logging.getLogger('wamp_server')
 
 
 def dummy_authenticate(realm, user_id, details):
@@ -50,4 +50,4 @@ if __name__ == '__main__':
         path,
         u"realm1",
     )
-    runner.run(Executor, logging_level=level)
+    runner.run(BackendSession, logging_level=level)

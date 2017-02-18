@@ -15,7 +15,7 @@ class TestQueue(BaseTest):
             side_effect=lambda *args, **kwargs: print('Success: %s %s' % (args, kwargs)))
         q = TasksQueue(session)
         for _i in range(10):
-            q.add_task('date', 'ivan', ('%d-%m-%Y %H:%M %Z',), {'utc': True})
+            q.add_task('date', ('%d-%m-%Y %H:%M %Z',), {'utc': True})
 
         asyncio.ensure_future(q.run_tasks())
         loop = asyncio.get_event_loop()
@@ -31,7 +31,7 @@ class TestQueue(BaseTest):
             side_effect=lambda *args, **kwargs: print('Success: %s %s' % (args, kwargs)))
         q = TasksQueue(session, concurrent=4)
         for _i in range(12):
-            q.add_task('sleep', 'ivan', (1,))
+            q.add_task('sleep', (1,))
 
         asyncio.ensure_future(q.run_tasks())
         loop = asyncio.get_event_loop()
@@ -49,11 +49,11 @@ class TestQueue(BaseTest):
         session = Mock()
         done = []
         session.notify_success = Mock(
-            side_effect=lambda id, user, res, dur: done.append(user))
+            side_effect=lambda task_id, res, dur, ctx: done.append(task_id))
         q = TasksQueue(session, concurrent=4)
         for _i in range(6):
-            q.add_task('sleep', 'ivan', (1,))
-        q.add_task('sleep', 'speedy', (0.8,), task_priority=MAX_PRIORITY)
+            q.add_task('sleep', (1,))
+        speedy_id=q.add_task('sleep', (0.8,), task_priority=MAX_PRIORITY)
         asyncio.ensure_future(q.run_tasks())
         loop = asyncio.get_event_loop()
         loop.run_until_complete(q.join(0.1))
@@ -63,7 +63,7 @@ class TestQueue(BaseTest):
         self.assertFalse(session.notify_error.called)
         
         self.assertEqual(len(done), 7)
-        self.assertEqual(done[0], 'speedy')
+        self.assertEqual(done[0], speedy_id)
         
         
     def test_error(self):
@@ -71,7 +71,7 @@ class TestQueue(BaseTest):
         session.notify_error = Mock(
             side_effect=lambda *args, **kwargs: print('Error: %s %s' % (args, kwargs)))
         q = TasksQueue(session)
-        q.add_task('sleep', 'ivan', ('a',))
+        q.add_task('sleep', ('a',))
         asyncio.ensure_future(q.run_tasks())
         loop = asyncio.get_event_loop()
         loop.run_until_complete(q.join(0.1))
@@ -86,7 +86,7 @@ class TestQueue(BaseTest):
         loop = asyncio.get_event_loop()
         run = loop.run_until_complete
         q = TasksQueue(session)
-        task_id=q.add_task('multi', 'ivan', (['date', 'sleep', 'date'], [(['%d-%m-%Y %H:%M %Z'], {'utc':True}), ([1], {}), 
+        task_id=q.add_task('multi', (['date', 'sleep', 'date'], [(['%d-%m-%Y %H:%M %Z'], {'utc':True}), ([1], {}), 
                                                 (['%d-%m-%Y %H:%M %Z'], {'utc':False}),]))
         asyncio.ensure_future(q.run_tasks())
         loop.run_until_complete(q.join(1.1))
@@ -95,18 +95,17 @@ class TestQueue(BaseTest):
         self.assertEqual(session.notify_success.call_count, 1)
         self.assertEqual(session.notify_progress.call_count, 3)
         for expected, received in zip([0.333, 0.666, 1.0],
-                                      map(lambda c: c[0][2],session.notify_progress.call_args_list)):
+                                      map(lambda c: c[0][1],session.notify_progress.call_args_list)):
             self.assertAlmostEqual(received, expected, 2)
         args = session.notify_success.call_args[0]
         self.assertEqual(args[0], task_id)
-        self.assertEqual(args[1], 'ivan')
-        results = args[2]['results']
+        results = args[1]['results']
         self.assertEqual(len(results), 3)
         self.assertEqual(len(results[0]), 20)
         self.assertEqual(results[0][-3:], 'UTC')
         self.assertEqual(len(results[2]), 20)
         self.assertTrue(results[1] is None)
-        duration = args[2]['duration']
+        duration = args[2]
         self.assertTrue(duration > 1)
         
     def test_multi_empty(self):
@@ -118,7 +117,7 @@ class TestQueue(BaseTest):
         q = TasksQueue(session)
         
         # test empty multi
-        task_id=q.add_task('multi', 'ivan', ([], []))
+        task_id=q.add_task('multi', ([], []))
         asyncio.ensure_future(q.run_tasks())
         run(q.join(0.1))
         self.assertEqual(session.notify_success.call_count, 1)

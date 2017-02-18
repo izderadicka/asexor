@@ -3,7 +3,7 @@ import logging
 import argparse
 import random
 from autobahn.asyncio.wamp import ApplicationSession
-from asexor.runner import ApplicationRunnerRawSocket
+from asexor.wamp_runner import ApplicationRunnerRawSocket
 from asexor.config import Config
 from collections import defaultdict, deque
 
