@@ -5,6 +5,7 @@ from asexor.task import get_task, BaseMultiTask, BaseSimpleTask
 from multiprocessing import cpu_count
 from asexor.config import NORMAL_PRIORITY
 import logging
+import time
 
 logger = logging.getLogger('tqueue')
 
@@ -32,7 +33,7 @@ class TasksQueue():
             # this is a hack - need to find a better way 
             await asyncio.sleep(0.1)
             # for security reason consider sync version of put and throw error when q is full
-            await self._q.put((task_priority, TaskInfo(task_id, task, task_args, task_kwargs, task_user, 
+            await self._q.put((task_priority, time.time(), TaskInfo(task_id, task, task_args, task_kwargs, task_user, 
                                                        None, None, None)))
         loop.create_task(_add())
         return task_id
@@ -41,7 +42,7 @@ class TasksQueue():
                  task_priority=NORMAL_PRIORITY, authenticated_user=None):
         task = get_task(task_name)(user=authenticated_user)
         task_id = uuid.uuid4().hex
-        await self._q.put((task_priority, TaskInfo(task_id, task, task_args, task_kwargs, task_user, 
+        await self._q.put((task_priority, time.time(), TaskInfo(task_id, task, task_args, task_kwargs, task_user, 
                                                    multitask, task_no, total_tasks)))
            
 
@@ -56,7 +57,7 @@ class TasksQueue():
     async def run_tasks(self):
         while self._running:
             await self._cc_semaphore.acquire()
-            priority, task = await self._q.get()
+            priority, _ts, task = await self._q.get()
             if isinstance(task.task, BaseSimpleTask):
                 
                 if task.multitask:
