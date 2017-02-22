@@ -89,6 +89,7 @@ class WampAsexorBackend(ApplicationSession):
 
     def onDisconnect(self):
         log.warn('Disconnected')
+        #TODO: is below needed?
         asyncio.get_event_loop().stop()
         
 
@@ -149,20 +150,18 @@ class WampBackendRunner(AbstractRunner):
         self.extra = extra or dict()
         self.serializer = serializer
 
-    def run(self, make, logging_level='info'):
+    def run(self, *, make=WampAsexorBackend, loop=None):
         """
         Run the application component.
 
         :param make: A factory that produces instances of :class:`autobahn.asyncio.wamp.ApplicationSession`
            when called with an instance of :class:`autobahn.wamp.types.ComponentConfig`.
-        :type make: callable 
+        :type make: callable or class
         """
         
         # loop initialization
-        loop = asyncio.get_event_loop()
-        logging.basicConfig(level=logging.DEBUG if logging_level == 'debug' else logging.INFO)
-        if logging_level == 'debug':
-            loop.set_debug(True)
+        loop = loop or asyncio.get_event_loop()
+        
 
         try:
             loop.add_signal_handler(signal.SIGTERM, loop.stop)

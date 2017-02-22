@@ -97,13 +97,14 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--number', type=int, default=10, help="number of remote calls")
     parser.add_argument('--use-wamp', action='store_true', help='Use WAMP protocol - requires WAMP router(crossbar.io) to be running')
     opts = parser.parse_args()
-    
+    loop = asyncio.get_event_loop()
     level = logging.INFO
     if opts.debug:
         level = logging.DEBUG
+        loop.set_debug(True)
     logging.basicConfig(level=level)
     
-    loop = asyncio.get_event_loop()
+    
     if opts.use_wamp:
         session = WampAsexorClient("tcp://localhost:9090",  u"realm1", 'ivan', 'ivan', loop=loop)
     else:

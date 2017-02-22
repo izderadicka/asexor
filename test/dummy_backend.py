@@ -4,6 +4,7 @@ from asexor.task import load_tasks_from
 import time
 
 import logging
+import asyncio
 
 log = logging.getLogger('ws_server')
 
@@ -41,15 +42,20 @@ if __name__ == '__main__':
         '-d', '--debug', action='store_true', help='enable debug',)
     parser.add_argument('--use-wamp', action='store_true', help='Use WAMP protocol - requires WAMP router(crossbar.io) to be running')
     opts = parser.parse_args()
-    
+    loop = asyncio.get_event_loop()
     if opts.debug:
-        level='debug'
+        level=logging.DEBUG
+        loop.set_debug(True)
     else:
-        level = 'info'
+        level = logging.INFO
+        
+    logging.basicConfig(level=level)
+    
+    
         
     if opts.use_wamp:
         # basic code to start WAMP ASEXOR backend
-        from asexor.wamp_backend import WampAsexorBackend, WampBackendRunner
+        from asexor.wamp_backend import WampBackendRunner
         Config.AUTHENTICATION_PROCEDUTE = dummy_authenticate
         Config.AUTHENTICATION_PROCEDURE_NAME = "eu.zderadicka.dummy_authenticate"
     
@@ -61,13 +67,13 @@ if __name__ == '__main__':
             path,
             u"realm1",
         )
-        runner.run(WampAsexorBackend, logging_level=level)
+        runner.run(loop=loop)
     else:
         # basic code to start aiohttp WS ASEXOR backend
-        from asexor.ws_backend import AsexorBackend, BackendRunner
+        from asexor.ws_backend import BackendRunner
         Config.WS_AUTHENTICATION_PROCEDUTE = dummy_authenticate_simple
         curr_dir = os.path.dirname(__file__)
         runner = BackendRunner(port=8484, static_dir=os.path.join(curr_dir, 'ws_client'))
-        runner.run(AsexorBackend, log_level=level)
+        runner.run(loop=loop)
     
     

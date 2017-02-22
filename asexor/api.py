@@ -29,12 +29,12 @@ class AbstractSessionAdapter(ABC):
 class AbstractRunner(ABC):
     """Class to run APEX backend process - implementation is specific for given protocol"""
     @abstractmethod
-    def run(self, make, logging_level='info'):
+    def run(self, *, make=None, loop=None):
         """
         Runs ASEXOR backend, starts loops, waits for SIGTERM to stop
 
-        :param make: factory to create backend specific session, based on backed type can require some params
-        :param logging_level: logging level - 'info' or 'debug'
+        :param make: (optional) factory to create backend specific session, based on backed type can require some params
+        :param loop: (optional) asyncio event loop
         """
         pass
     

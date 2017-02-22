@@ -203,7 +203,7 @@ class BackendRunner(AbstractRunner):
         self.static_dir = static_dir
         
     
-    def run(self, session_factory, log_level='info'):
+    def run(self, *, make=AsexorBackend, loop=None):
         """
         Start server and runs forever
         :param session_factory:   :class: `BackendSession` class - or factory function that return instance of that.
@@ -211,15 +211,10 @@ class BackendRunner(AbstractRunner):
         :param logging level:  if 'debug', then debugging logging is enabled
         """ 
         
-        if log_level == 'debug':
-            level=logging.DEBUG
-        else:
-            level = logging.INFO
-            
-        logging.basicConfig(level=level)
         
-        app = web.Application()
-        session = session_factory(app.loop)
+        
+        app = web.Application(loop=loop)
+        session = make(app.loop)
         app.on_startup.append(session.start_tasks_queue)
         app.on_shutdown.append(session.close_all_websockets)
         app.on_cleanup.append(session.stop_tasks_queue)
