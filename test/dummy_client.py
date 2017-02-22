@@ -5,6 +5,7 @@ import argparse
 from collections import defaultdict, deque
 import random
 from asexor.ws_client import AsexorClient
+from asexor.wamp_client import WampAsexorClient
 
 logger = logging.getLogger('ws_client')
 
@@ -94,6 +95,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '-d', '--debug', action='store_true', help='enable debug')
     parser.add_argument('-n', '--number', type=int, default=10, help="number of remote calls")
+    parser.add_argument('--use-wamp', action='store_true', help='Use WAMP protocol - requires WAMP router(crossbar.io) to be running')
     opts = parser.parse_args()
     
     level = logging.INFO
@@ -102,13 +104,14 @@ if __name__ == '__main__':
     logging.basicConfig(level=level)
     
     loop = asyncio.get_event_loop()
-    session = AsexorClient('http://localhost:8484/ws', 'ivan', loop)
-    session.start()
-    loop.run_until_complete(session.wait_ready())
+    if opts.use_wamp:
+        session = WampAsexorClient("tcp://localhost:9090",  u"realm1", 'ivan', 'ivan', loop=loop)
+    else:
+        session = AsexorClient('http://localhost:8484/ws', 'ivan', loop)
+    loop.run_until_complete(session.start())
     client =  MyClient(opts.number or 10, session, loop)
     loop.run_until_complete(client.run())
-    session.stop()
-    loop.run_until_complete(session.wait_finished())
+    loop.run_until_complete(session.stop())
     
     
     

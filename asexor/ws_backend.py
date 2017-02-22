@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from asexor.tqueue import TasksQueue, NORMAL_PRIORITY, AbstractSessionAdapter
+from asexor.tqueue import TasksQueue, NORMAL_PRIORITY 
+from asexor.api import AbstractSessionAdapter, AbstractRunner
 from asexor.config import Config, ConfigError
 from collections import defaultdict
 from aiohttp import web
@@ -47,7 +48,7 @@ class SessionAdapter(AbstractSessionAdapter):
                            })
 
 
-class BackendSession:
+class AsexorBackend:
 
     def __init__(self, loop=None):
         if not Config.WS_AUTHENTICATION_PROCEDUTE:
@@ -137,7 +138,7 @@ class BackendSession:
                         send_error('kwargs must be a dict/object')
                         continue
 
-                    ctx = BackendSession.CallContext(
+                    ctx = AsexorBackend.CallContext(
                         call_id, user, role, ws, asyncio.Task.current_task())
                     try:
                         task_id = self.schedule_task(
@@ -186,3 +187,49 @@ class BackendSession:
             for ws in active_ws:
                 await ws.close(code=code,
                                message=message)
+                
+                
+class BackendRunner(AbstractRunner):
+    log = logging.getLogger('ws_backend.runner')
+    def __init__(self, host='0.0.0.0', port=8484, static_dir=None):
+        """ Starts http server on host:post, serving ASEXOR protocol via WebSocketon http://host:port/ws.
+        
+        :param host: - interface to listen on, default is 0.0.0.0 - all available interfaces
+        :param port: TCP post to listen on
+        :param static_dir: - serve also files from this directory - only for test and development !
+        """
+        self.host = host
+        self.port = port
+        self.static_dir = static_dir
+        
+    
+    def run(self, session_factory, log_level='info'):
+        """
+        Start server and runs forever
+        :param session_factory:   :class: `BackendSession` class - or factory function that return instance of that.
+               Should accept loop parameter.
+        :param logging level:  if 'debug', then debugging logging is enabled
+        """ 
+        
+        if log_level == 'debug':
+            level=logging.DEBUG
+        else:
+            level = logging.INFO
+            
+        logging.basicConfig(level=level)
+        
+        app = web.Application()
+        session = session_factory(app.loop)
+        app.on_startup.append(session.start_tasks_queue)
+        app.on_shutdown.append(session.close_all_websockets)
+        app.on_cleanup.append(session.stop_tasks_queue)
+        
+        app.router.add_get('/ws', session.ws_handler)
+        if self.static_dir:
+            app.router.add_static('/', self.static_dir, show_index=True)
+            self.log.info('Serving static  files from %s', self.static_dir)
+        try:
+            web.run_app(app, host=self.host, port=8484)
+            
+        except asyncio.CancelledError:
+            pass

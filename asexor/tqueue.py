@@ -6,31 +6,11 @@ from multiprocessing import cpu_count
 from asexor.config import NORMAL_PRIORITY
 import logging
 import time
-from abc import ABC, abstractmethod
 
 logger = logging.getLogger('tqueue')
 
 TaskInfo = namedtuple(
     'TaskInfo', ['id', 'task', 'args', 'kwargs', 'context', 'multitask', 'task_no', 'total_tasks'])
-
-
-class AbstractSessionAdapter(ABC):
-
-    @abstractmethod
-    def notify_start(self, task_id, task_context=None):
-        pass
-    
-    @abstractmethod
-    def notify_success(self, task_id, res, duration, task_context=None):
-        pass
-    
-    @abstractmethod   
-    def notify_progress(self, task_id, progress, task_context=None):
-        pass
-    
-    @abstractmethod
-    def notify_error(self, task_id, err, duration, task_context=None):
-        pass
 
 
 class TasksQueue():
