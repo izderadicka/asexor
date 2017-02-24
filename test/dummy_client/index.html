@@ -3,10 +3,7 @@
   <meta charset="utf-8">
   <title>Test Asexor</title>
   <style>
-    .hidden {
-      display:none;
-    }
-
+    
     .results-section {
     margin-top: 3em;
     }
@@ -34,11 +31,18 @@
   <div class="container">
 <h1>ASEXOR = ASynchronous EXecutOR</h1>
 <h2>Requirements</h2>
-  <p> Recent Browser (ES6 support - FF 45+, Chorme 51+), Linux, Python 3.5 (3.5 only!), python package aiohttp</p>
+  <p> Recent Browsers, Linux, Python 3.5 (3.5 only!), python package aiohttp, (optionally authobahn and crossbar)</p>
   <p>Assure that ws_server , <br>
-    <code>python ws_server.py</code> <br>
+    <code>python dummy_server.py</code> <br>
     is started from test directory.
   </p>
+
+<div id="loading-message">
+  <h2> <i class="fa fa-spinner fa-pulse fa-1x fa-fw"></i> Connecting to ASEXOR backend
+  <i class="fa fa-spinner fa-pulse fa-1x fa-fw"></i> </h2>
+</div>
+
+<div id="tasks-panel" class="hidden">
 <h2>Test remote tasks</h2>
 <div id="task selector" class="form-group">
   <label>Task</label>
@@ -74,8 +78,6 @@
     <tbody id="results">
     </tbody>
   </table>
-
-<div>
 </div>
 </div>
 

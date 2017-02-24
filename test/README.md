@@ -12,7 +12,7 @@ Example how to use is in `test` directory. Assure you have Python 3.5 as default
 1. install requirements `pip install -r requirements.txt`
 2. cd to `test` directory
 3. run `PYTHONPATH=.. python dummy_backend.py -d`
-4. open `http://localhost:8484` in recent modern browser (FF, Chrome).
+4. open `http://localhost:8484/index.html` in recent modern browser (FF, Chrome).
 5. Select task and run 
 6. try also python client `PYTHONPATH=.. python dummy_client.py -n 10  -d user_name` in other terminal window
 

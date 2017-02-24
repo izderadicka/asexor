@@ -49,7 +49,6 @@ class WampAsexorClient(AbstractClient):
     
         def onDisconnect(self):
             logger.debug('Disconnected')
-            
         
         
     def __init__(self, url, realm, user, token, loop=None):
@@ -66,4 +65,8 @@ class WampAsexorClient(AbstractClient):
             
     async def run(self):
         (t,p) = await start_wamp_session(self.url, lambda: self.session, self.loop)
+        
+    @property
+    def active(self):
+        return self.session.is_connected() and self.session.is_attached()
         

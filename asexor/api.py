@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 
 logger = logging.getLogger('api')
 
@@ -99,6 +99,10 @@ class AbstractClient(ABC):
     
     @abstractmethod
     async def run(self):
+        pass
+    
+    @abstractproperty
+    def active(self):
         pass
         
     

@@ -221,10 +221,10 @@ class BackendRunner(AbstractRunner):
         
         app.router.add_get('/ws', session.ws_handler)
         if self.static_dir:
-            app.router.add_static('/', self.static_dir, show_index=True)
+            app.router.add_static('/', self.static_dir, show_index=True, follow_symlinks=True)
             self.log.info('Serving static  files from %s', self.static_dir)
         try:
-            web.run_app(app, host=self.host, port=8484)
+            web.run_app(app, host=self.host, port=self.port)
             
         except asyncio.CancelledError:
             pass

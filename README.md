@@ -20,7 +20,7 @@ To play without installing `git clone https://github.com/izderadicka/asexor`
 1. install requirements `pip install -r requirements.txt` (optional if not installed with setup.py)
 2. cd to `asexor/test` directory
 3. run `PYTHONPATH=.. python dummy_backend.py -d` 
-4. open `http://localhost:8484` in recent modern browser (FF, Chrome).
+4. open `http://localhost:8484/index.html` in recent modern browser (FF, Chrome).
 5. Select task and run 
 6. try also python client `PYTHONPATH=.. python dummy_client.py -n 10  -d user_name` in other terminal window
 
@@ -43,6 +43,11 @@ Multitasks
 You can create a task that creates multiple simple tasks, which will be scheduled subsequently 
 (next task is scheduled after previous task is finished).
 Check `asexor.task.BaseMultiTask` class (which takes list of task names and their arguments as input)
+
+License
+-------
+GPL v.3 and newer
+
 
 
 
