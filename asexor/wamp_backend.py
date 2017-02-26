@@ -4,7 +4,7 @@ import signal
 from autobahn.asyncio.wamp import ApplicationSession
 from autobahn.wamp.types import PublishOptions, RegisterOptions
 from asexor.tqueue import TasksQueue, NORMAL_PRIORITY
-from asexor.api import AbstractSessionAdapter, AbstractRunner
+from asexor.api import AbstractTaskContext, AbstractRunner
 from asexor.config import Config, ConfigError
 from autobahn.asyncio.rawsocket import WampRawSocketClientFactory
 from autobahn.wamp.types import ComponentConfig
@@ -13,14 +13,15 @@ from urllib.parse import urlparse
 log = logging.getLogger('wamp_backend')
 
 
-class SessionAdapter(AbstractSessionAdapter):
+class CallContext(AbstractTaskContext):
 
-    def __init__(self, session):
+    def __init__(self, session, caller=None):
         self._session = session
+        self._caller = caller
 
-    def _options(self, task_context):
-        if Config.LIMIT_PUBLISH_BY == 'SESSION' and task_context and task_context.caller:
-            return PublishOptions(eligible=[task_context.caller])
+    def _options(self):
+        if Config.LIMIT_PUBLISH_BY == 'SESSION'  and self._caller:
+            return PublishOptions(eligible=[self._caller])
         elif not Config.LIMIT_PUBLISH_BY:
             return None
 
@@ -28,24 +29,24 @@ class SessionAdapter(AbstractSessionAdapter):
 
         # return PublishOptions(eligible_authid=[task_user]
 
-    def notify_start(self, task_id, task_context=None):
+    def notify_start(self, task_id,):
         self._session.publish(Config.UPDATE_CHANNEL, task_id, status='started',
-                              options=self._options(task_context))
+                              options=self._options())
 
-    def notify_success(self, task_id, res, duration, task_context=None):
+    def notify_success(self, task_id, res, duration):
         self._session.publish(Config.UPDATE_CHANNEL, task_id,
                               status='success', result=res, duration=duration,
-                              options=self._options(task_context))
+                              options=self._options())
         
-    def notify_progress(self, task_id, progress, task_context=None):
+    def notify_progress(self, task_id, progress):
         self._session.publish(Config.UPDATE_CHANNEL, task_id,
                               status='progress', progress=progress,
-                              options=self._options(task_context))
+                              options=self._options())
 
-    def notify_error(self, task_id, err, duration, task_context=None):
+    def notify_error(self, task_id, err, duration):
         self._session.publish(Config.UPDATE_CHANNEL, task_id,
                               status='error', error=str(err) or repr(err), duration=duration,
-                              options=self._options(task_context))
+                              options=self._options())
 
 
 class WampAsexorBackend(ApplicationSession):
@@ -57,8 +58,7 @@ class WampAsexorBackend(ApplicationSession):
         if Config.AUTHORIZATION_PROCEDURE and Config.AUTHORIZATION_PROCEDURE_NAME:
             self.register(Config.AUTHORIZATION_PROCEDURE, Config.AUTHORIZATION_PROCEDURE_NAME)
             
-        self.tasks = TasksQueue(SessionAdapter(self),
-                                concurrent=Config.CONCURRENT_TASKS,
+        self.tasks = TasksQueue(concurrent=Config.CONCURRENT_TASKS,
                                 queue_size=Config.TASKS_QUEUE_MAX_SIZE)
 
         def run_task(task_name, *args, **kwargs):
@@ -75,7 +75,7 @@ class WampAsexorBackend(ApplicationSession):
                     role, Config.DEFAULT_PRIORITY)
             task_id = self.tasks.add_task(
                 task_name, args, kwargs, task_priority, authenticated_user=authid, 
-                task_context=details)
+                task_context=CallContext(self, details.caller))
             return task_id
         self.register(run_task, Config.RUN_TASK_PROC, RegisterOptions(
             details_arg='__call_details__'))

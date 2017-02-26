@@ -15,9 +15,8 @@ TaskInfo = namedtuple(
 
 class TasksQueue():
 
-    def __init__(self, session, concurrent=None, queue_size=0):
+    def __init__(self, concurrent=None, queue_size=0):
         self._q = asyncio.PriorityQueue(maxsize=queue_size)
-        self._session = session
         self._running = True
         if not concurrent:
             concurrent = cpu_count()
@@ -25,6 +24,7 @@ class TasksQueue():
 
     def add_task(self, task_name, task_args=(), task_kwargs={}, 
                  task_priority=NORMAL_PRIORITY, authenticated_user=None, task_context=None):
+        assert(not task_context is None)
         task = get_task(task_name)(user=authenticated_user)
         task_id = uuid.uuid4().hex
         loop = asyncio.get_event_loop()
@@ -40,6 +40,7 @@ class TasksQueue():
     
     async def add_subtask(self, multitask, task_no, total_tasks, task_name, task_args=(), task_kwargs={}, 
                  task_priority=NORMAL_PRIORITY, authenticated_user=None, task_context=None):
+        assert(not task_context is None)
         task = get_task(task_name)(user=authenticated_user)
         task_id = uuid.uuid4().hex
         await self._q.put((task_priority, time.time(), TaskInfo(task_id, task, task_args, task_kwargs, task_context, 
@@ -67,12 +68,12 @@ class TasksQueue():
                         self.run_async(self.run_subtask, task, (priority,))
                     else:
                         # notify task start
-                        self._session.notify_start(task.id, task.context)
+                        task.context.notify_start(task.id)
                         self.run_async(self.run_one, task)
                     
                 elif isinstance(task.task, BaseMultiTask):
                     # notify task start
-                    self._session.notify_start(task.id, task.context)
+                    task.context.notify_start(task.id)
                     self.run_async(self.start_multitask, task, (priority,), 
                                    error_msg='Multitask %s(%s, %s) id %s start failed with %s')
         except asyncio.CancelledError:
@@ -90,7 +91,7 @@ class TasksQueue():
             except Exception as e:
                 logger.exception(error_msg,
                              task.task.NAME, task.args, task.kwargs, task.id, e)
-                self._session.notify_error(task.id, e, task.task.duration, task.context)
+                task.context.notify_error(task.id, e, task.task.duration)
             finally:
                     self._q.task_done()
                     self._cc_semaphore.release()
@@ -99,7 +100,7 @@ class TasksQueue():
 
     async def start_multitask(self, task, priority):
         def multitask_finished(res):
-            self._session.notify_success(task.id, res, task.task.duration, task.context)
+            task.context.notify_success(task.id, res, task.task.duration)
         await task.task.start(*task.args, **task.kwargs)
         new_task = await task.task.next_task()
         if not new_task:
@@ -115,15 +116,14 @@ class TasksQueue():
     
     async def run_one(self, task):
         res = await task.task.run(*task.args, **task.kwargs)
-        self._session.notify_success(task.id, res, task.task.duration, task.context)
+        task.context.notify_success(task.id, res, task.task.duration)
         
     async def run_subtask(self, task, priority):
         def multitask_finished(res):
-            self._session.notify_success(task.multitask.id, res, task.multitask.task.duration,
-                                         task.multitask.context)
+            task.multitask.context.notify_success(task.multitask.id, res, task.multitask.task.duration)
             
         def multitask_progress(progress):
-            self._session.notify_progress(task.multitask.id, progress, task.multitask.context)
+            task.multitask.context.notify_progress(task.multitask.id, progress)
         try:
             res = await task.task.run(*task.args, **task.kwargs)
             await task.multitask.task.update_task_result(task.task_no, result=res, 
@@ -137,8 +137,7 @@ class TasksQueue():
                                                          on_progress=multitask_progress)
             except Exception as e:
                 logger.exception('Task update error')
-                self._session.notify_error(task.multitask.id, e, task.multitask.task.duration,
-                                           task.multitask.context)
+                task.multitask.context.notify_error(task.multitask.id, e, task.multitask.task.duration)
                 return
         try:
             new_task = await task.multitask.task.next_task()
@@ -148,8 +147,7 @@ class TasksQueue():
                                        task.task.user, task.context)
         except Exception as e:
             logger.exception('Get next task error')
-            self._session.notify_error(task.multitask.id, e, task.multitask.task.duration,
-                                       task.multitask.context)
+            task.multitask.context.notify_error(task.multitask.id, e, task.multitask.task.duration)
             
             
             

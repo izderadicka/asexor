@@ -4,25 +4,25 @@ from abc import ABC, abstractmethod, abstractproperty
 
 logger = logging.getLogger('api')
 
-class AbstractSessionAdapter(ABC):
+class AbstractTaskContext(ABC):
     """
     Adapts backend session fro purpose of :class:`asexor.tqueue.TasksQueue`
     """
 
     @abstractmethod
-    def notify_start(self, task_id, task_context=None):
+    def notify_start(self, task_id):
         pass
 
     @abstractmethod
-    def notify_success(self, task_id, res, duration, task_context=None):
+    def notify_success(self, task_id, res, duration):
         pass
 
     @abstractmethod
-    def notify_progress(self, task_id, progress, task_context=None):
+    def notify_progress(self, task_id, progress):
         pass
 
     @abstractmethod
-    def notify_error(self, task_id, err, duration, task_context=None):
+    def notify_error(self, task_id, err, duration):
         pass
 
 

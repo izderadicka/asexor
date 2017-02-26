@@ -1,6 +1,6 @@
 from autobahn.asyncio.wamp import ApplicationSession
 from autobahn.wamp.types import ComponentConfig
-from asexor.wamp_runner import start_wamp_session
+from asexor.wamp_backend import start_wamp_session
 from asexor.config import Config
 from asexor.api import AbstractClient
 import logging

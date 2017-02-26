@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from asexor.tqueue import TasksQueue, NORMAL_PRIORITY 
-from asexor.api import AbstractSessionAdapter, AbstractRunner
+from asexor.api import AbstractTaskContext, AbstractRunner
 from asexor.config import Config, ConfigError
 from collections import defaultdict
 from aiohttp import web
@@ -21,28 +21,36 @@ def assure_coro_fn(fn_or_coro):
     else:
         raise ValueError('Parameter is not method, function or coroutine')
 
+class CallContext(AbstractTaskContext):
 
-class SessionAdapter(AbstractSessionAdapter):
+    def __init__(self, call_id, ws):
+        self._ws = ws
+        self.call_id = call_id
 
-    def notify_start(self, task_id, task_context=None):
-        task_context.send({'task_id': task_id,
+    def _send(self, data):
+        self._ws.send_json(
+            {'t': 'm', 'call_id': self.call_id, 'data': data})
+
+
+    def notify_start(self, task_id):
+        self._send({'task_id': task_id,
                            'status': 'started'})
 
-    def notify_success(self, task_id, res, duration, task_context=None):
-        task_context.send({'task_id': task_id,
+    def notify_success(self, task_id, res, duration):
+        self._send({'task_id': task_id,
                            'status': 'success',
                            'result': res, 'duration': duration
                            })
 
-    def notify_error(self, task_id, err, duration, task_context=None):
-        task_context.send({'task_id': task_id,
+    def notify_error(self, task_id, err, duration):
+        self._send({'task_id': task_id,
                            'status': 'error',
                            'error': str(err) or repr(err),
                            'duration': duration,
                            })
 
     def notify_progress(self, task_id, progress, task_context=None):
-        task_context.send({'task_id': task_id,
+        self._send({'task_id': task_id,
                            'status': 'progress',
                            'progress': progress,
                            })
@@ -56,8 +64,7 @@ class AsexorBackend:
         self.autheticator = assure_coro_fn(Config.WS_AUTHENTICATION_PROCEDUTE)
         self.websockets = defaultdict(set)
         self.handlers = defaultdict(set)
-        self.tasks = TasksQueue(SessionAdapter(),
-                                concurrent=Config.CONCURRENT_TASKS,
+        self.tasks = TasksQueue(concurrent=Config.CONCURRENT_TASKS,
                                 queue_size=Config.TASKS_QUEUE_MAX_SIZE)
 
     def start_tasks_queue(self, app):
@@ -69,22 +76,6 @@ class AsexorBackend:
         if self._tq_task:
             self._tq_task.cancel()
             await self._tq_task
-
-    class CallContext:
-
-        def __init__(self, call_id, user, role,  ws, handler):
-            self._ws = ws
-            self._handler = handler
-            self.call_id = call_id
-            self.user = user
-            self.role = role
-
-        def send(self, data):
-            self._ws.send_json(
-                {'t': 'm', 'call_id': self.call_id, 'data': data})
-
-        def close_session(self):
-            self._handler.cancel()
 
     def close_user_websockets(self, user):
         for handler in self.handlers[user]:
@@ -138,11 +129,10 @@ class AsexorBackend:
                         send_error('kwargs must be a dict/object')
                         continue
 
-                    ctx = AsexorBackend.CallContext(
-                        call_id, user, role, ws, asyncio.Task.current_task())
+                    ctx = CallContext(call_id, ws)
                     try:
                         task_id = self.schedule_task(
-                            ctx, task_name, *call_args[1:], **call_kwargs)
+                            ctx, user, role, task_name, *call_args[1:], **call_kwargs)
                         res = {
                             't': 'r', 'call_id': call_id, 'returned': task_id}
                         logger.debug('Sending respose: %s', res)
@@ -165,17 +155,16 @@ class AsexorBackend:
             self.handlers[user].remove(asyncio.Task.current_task())
         return ws
 
-    def schedule_task(self, ctx, task_name, *args, **kwargs):
+    def schedule_task(self, ctx, user, role, task_name, *args, **kwargs):
         logger.debug(
             'Request for run task %s %s %s', task_name, args, kwargs)
 
-        authid = ctx.user
         task_priority = Config.DEFAULT_PRIORITY
-        if ctx.role:
+        if role:
             task_priority = Config.PRIORITY_MAP.get(
-                ctx.role, Config.DEFAULT_PRIORITY)
+                role, Config.DEFAULT_PRIORITY)
         task_id = self.tasks.add_task(
-            task_name, args, kwargs, task_priority, authenticated_user=authid,
+            task_name, args, kwargs, task_priority, authenticated_user=user,
             task_context=ctx)
         return task_id
 
