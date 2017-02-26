@@ -26,15 +26,24 @@ class AbstractTaskContext(ABC):
         pass
 
 
-class AbstractRunner(ABC):
-    """Class to run APEX backend process - implementation is specific for given protocol"""
+class AbstractBackend(ABC):
+    """Class to  run APEX backend protocol - implementation is specific for given protocol"""
+    def __init__(self, loop, **kwargs):
+        self.loop = loop
+        
     @abstractmethod
-    def run(self, *, make=None, loop=None):
+    async def start(self, tasks_queue):
         """
-        Runs ASEXOR backend, starts loops, waits for SIGTERM to stop
-
-        :param make: (optional) factory to create backend specific session, based on backed type can require some params
-        :param loop: (optional) asyncio event loop
+        Starts backend protocol
+        :param tasks_queue:  ASEXOR tasks queue 
+        :type tasks_queue: `asexor.tqueue.TasksQueue`
+        """
+        pass
+    
+    @abstractmethod
+    async def stop(self):
+        """
+        Stops backend protocol
         """
         pass
     

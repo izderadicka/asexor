@@ -1,6 +1,8 @@
 import os.path
 from asexor.config import Config
 from asexor.task import load_tasks_from
+from asexor.backend_runner import Runner
+from asexor.ws_backend import WsAsexorBackend
 import time
 import logging
 import asyncio
@@ -64,33 +66,26 @@ if __name__ == '__main__':
     curr_dir = os.path.dirname(__file__)
     client_dir = os.path.join(curr_dir, 'dummy_client')
     
+    # basic code to start aiohttp WS ASEXOR backend
+    Config.WS_AUTHENTICATION_PROCEDUTE = dummy_authenticate_simple
+    protocols =[(WsAsexorBackend, {'port':8484, 'static_dir':client_dir})]
+    
         
     if opts.use_wamp:
         # basic code to start WAMP ASEXOR backend
-        from asexor.wamp_backend import WampBackendRunner
+        from asexor.wamp_backend import WampAsexorBackend
         Config.AUTHENTICATION_PROCEDUTE = dummy_authenticate
         Config.AUTHENTICATION_PROCEDURE_NAME = "eu.zderadicka.dummy_authenticate"
     
         Config.AUTHORIZATION_PROCEDURE = dummy_authorize
         Config.AUTHORIZATION_PROCEDURE_NAME = "eu.zderadicka.dummy_authorize"
         
-        srv = serve_dir(client_dir, port=8484, loop=loop)
+        
     
         path = os.path.join(os.path.dirname(__file__), '.crossbar/socket1')
-        runner = WampBackendRunner(
-            path,
-            u"realm1",
-        )
-        try:
-            runner.run(loop=loop)
-        finally:
-            pass
-            #srv.close()
-    else:
-        # basic code to start aiohttp WS ASEXOR backend
-        from asexor.ws_backend import BackendRunner
-        Config.WS_AUTHENTICATION_PROCEDUTE = dummy_authenticate_simple
-        runner = BackendRunner(port=8484, static_dir=client_dir)
-        runner.run(loop=loop)
-    
+        protocols.append((WampAsexorBackend, {'url':path, 'realm': u"realm1",}))
+
+        
+    runner = Runner(protocols)
+    runner.run()
     

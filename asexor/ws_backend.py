@@ -1,7 +1,6 @@
 import asyncio
 import logging
-from asexor.tqueue import TasksQueue, NORMAL_PRIORITY 
-from asexor.api import AbstractTaskContext, AbstractRunner
+from asexor.api import AbstractTaskContext, AbstractBackend
 from asexor.config import Config, ConfigError
 from collections import defaultdict
 from aiohttp import web
@@ -56,26 +55,15 @@ class CallContext(AbstractTaskContext):
                            })
 
 
-class AsexorBackend:
+class AsexorBackendSession:
 
-    def __init__(self, loop=None):
+    def __init__(self, tasks_queue, loop=None):
         if not Config.WS_AUTHENTICATION_PROCEDUTE:
             raise ConfigError('WS_AUTHENTICATION_PROCEDUTE is missing')
         self.autheticator = assure_coro_fn(Config.WS_AUTHENTICATION_PROCEDUTE)
         self.websockets = defaultdict(set)
         self.handlers = defaultdict(set)
-        self.tasks = TasksQueue(concurrent=Config.CONCURRENT_TASKS,
-                                queue_size=Config.TASKS_QUEUE_MAX_SIZE)
-
-    def start_tasks_queue(self, app):
-        self._tq_task = app.loop.create_task(self.tasks.run_tasks())
-        logger.debug('Tasks queue running in task %s', self._tq_task)
-
-    async def stop_tasks_queue(self, *args, **kwargs):
-        self.tasks.stop()
-        if self._tq_task:
-            self._tq_task.cancel()
-            await self._tq_task
+        self.tasks = tasks_queue
 
     def close_user_websockets(self, user):
         for handler in self.handlers[user]:
@@ -178,42 +166,55 @@ class AsexorBackend:
                                message=message)
                 
                 
-class BackendRunner(AbstractRunner):
-    log = logging.getLogger('ws_backend.runner')
-    def __init__(self, host='0.0.0.0', port=8484, static_dir=None):
+class WsAsexorBackend(AbstractBackend):
+    
+    def __init__(self, loop, host='0.0.0.0', port=8484, static_dir=None, 
+                 ssl_context=None, backlog=128):
         """ Starts http server on host:post, serving ASEXOR protocol via WebSocketon http://host:port/ws.
         
         :param host: - interface to listen on, default is 0.0.0.0 - all available interfaces
         :param port: TCP post to listen on
         :param static_dir: - serve also files from this directory - only for test and development !
         """
+        self.loop=loop
         self.host = host
         self.port = port
         self.static_dir = static_dir
+        self.app = None
+        self.ssl_context = ssl_context
+        self.backlog = backlog
+        
         
     
-    def run(self, *, make=AsexorBackend, loop=None):
+    async def start(self, tasks_queue):
         """
-        Start server and runs forever
-        :param session_factory:   :class: `BackendSession` class - or factory function that return instance of that.
-               Should accept loop parameter.
-        :param logging level:  if 'debug', then debugging logging is enabled
+        Starts aiohttp server for ASEXOR WebSocket protocol
         """ 
         
+        self.app = web.Application(loop=self.loop)
+        session = AsexorBackendSession(tasks_queue, self.app.loop)
+        self.app.on_shutdown.append(session.close_all_websockets)
         
-        
-        app = web.Application(loop=loop)
-        session = make(app.loop)
-        app.on_startup.append(session.start_tasks_queue)
-        app.on_shutdown.append(session.close_all_websockets)
-        app.on_cleanup.append(session.stop_tasks_queue)
-        
-        app.router.add_get('/ws', session.ws_handler)
+        self.app.router.add_get('/ws', session.ws_handler)
         if self.static_dir:
-            app.router.add_static('/', self.static_dir, show_index=True, follow_symlinks=True)
-            self.log.info('Serving static  files from %s', self.static_dir)
-        try:
-            web.run_app(app, host=self.host, port=self.port)
-            
-        except asyncio.CancelledError:
-            pass
+            self.app.router.add_static('/', self.static_dir, show_index=True, follow_symlinks=True)
+            logger.info('Serving static  files from %s', self.static_dir)
+        
+        
+        self.handler = self.app.make_handler(access_log=aiohttp.log.access_logger)
+    
+        await self.app.startup()
+        self.srv = await self.loop.create_server(self.handler, self.host,
+                                                         self.port, ssl=self.ssl_context,
+                                                         backlog=self.backlog)
+    
+        logger.info('aiohttp server running on %s port %s', self.host, self.port)
+        
+        
+    async def stop(self):
+        self.srv.close()
+        await self.srv.wait_closed()
+        await self.app.shutdown()
+        await self.handler.shutdown(10.0)
+        await self.app.cleanup()
+

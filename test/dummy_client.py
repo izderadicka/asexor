@@ -7,7 +7,7 @@ import random
 from asexor.ws_client import AsexorClient
 from asexor.wamp_client import WampAsexorClient
 
-logger = logging.getLogger('ws_client')
+logger = logging.getLogger('dummy_client')
 
                 
 TASKS = [('date', ('%d-%m-%Y %H:%M %Z',), {'utc': True}),

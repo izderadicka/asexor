@@ -3,8 +3,7 @@ import logging
 import signal
 from autobahn.asyncio.wamp import ApplicationSession
 from autobahn.wamp.types import PublishOptions, RegisterOptions
-from asexor.tqueue import TasksQueue, NORMAL_PRIORITY
-from asexor.api import AbstractTaskContext, AbstractRunner
+from asexor.api import AbstractTaskContext, AbstractBackend
 from asexor.config import Config, ConfigError
 from autobahn.asyncio.rawsocket import WampRawSocketClientFactory
 from autobahn.wamp.types import ComponentConfig
@@ -49,7 +48,11 @@ class CallContext(AbstractTaskContext):
                               options=self._options())
 
 
-class WampAsexorBackend(ApplicationSession):
+class AsexorBackendSession(ApplicationSession):
+    
+    def __init__(self, config, tasks_queue):
+        super(AsexorBackendSession, self).__init__(config)
+        self.tasks=tasks_queue
 
     async def onJoin(self, details):
         log.info('started session with details %s', details)
@@ -58,8 +61,6 @@ class WampAsexorBackend(ApplicationSession):
         if Config.AUTHORIZATION_PROCEDURE and Config.AUTHORIZATION_PROCEDURE_NAME:
             self.register(Config.AUTHORIZATION_PROCEDURE, Config.AUTHORIZATION_PROCEDURE_NAME)
             
-        self.tasks = TasksQueue(concurrent=Config.CONCURRENT_TASKS,
-                                queue_size=Config.TASKS_QUEUE_MAX_SIZE)
 
         def run_task(task_name, *args, **kwargs):
             log.debug(
@@ -119,17 +120,13 @@ def start_wamp_session(url, session_factory, loop, serializer = None):
     return coro
 
 
-class WampBackendRunner(AbstractRunner):
+class WampAsexorBackend(AbstractBackend):
     """
-    Runs WAMP session (defined by ApplicationSession class) over raw socket protocol (eiher TCP socket,
-    or UNIX domain socket).
-    As WAMP is basically symmetrical can be used to run either ASEXOR backend or ASEXOR client.
-    Runs forever until terminated by signal (TERM) or default asyncio loop is stopped.
+    Runs WAMP backend session 
     """
-    log=logging.getLogger('wamp_runner')
-    def __init__(self, url, realm='realm1', extra=None, serializer=None):
+    def __init__(self, loop, url, realm='realm1', extra=None, serializer=None):
         """
-        :param url: Raw socket unicode - either path on local server to unix socket (or unix:/path)
+        :param url: either path on local server to unix socket (or unix:/path)
              or tcp://host:port for internet socket
         :type url: unicode
 
@@ -149,62 +146,28 @@ class WampBackendRunner(AbstractRunner):
         self.realm = realm
         self.extra = extra or dict()
         self.serializer = serializer
+        self.loop=loop
 
-    def run(self, *, make=WampAsexorBackend, loop=None):
-        """
-        Run the application component.
-
-        :param make: A factory that produces instances of :class:`autobahn.asyncio.wamp.ApplicationSession`
-           when called with an instance of :class:`autobahn.wamp.types.ComponentConfig`.
-        :type make: callable or class
-        """
-        
-        # loop initialization
-        loop = loop or asyncio.get_event_loop()
-        
-
-        try:
-            loop.add_signal_handler(signal.SIGTERM, loop.stop)
-        except NotImplementedError:
-            # signals are not available on Windows
-            pass
-
-        def handle_error(loop, context):
-            self.log.error('Application Error: %s', context)
-            if 'exception' in context and context['exception']:
-                import traceback
-                e = context['exception']
-                tb='\n'.join(traceback.format_tb(e.__traceback__)) if hasattr(e, '__traceback__') else ''
-                logging.error('Exception : %s \n %s', repr(e), tb)
-            loop.stop()
-
-        loop.set_exception_handler(handle_error)
-        
+    async def start(self, tasks_queue):
         
         # session factory
         def create():
             cfg = ComponentConfig(self.realm, self.extra)
             try:
-                session = make(cfg)
+                session = AsexorBackendSession(cfg, tasks_queue)
             except Exception:
-                self.log.exception("App session could not be created! ")
+                log.exception("App session could not be created! ")
                 asyncio.get_event_loop().stop()
             else:
                 return session
 
-        coro = start_wamp_session(self.url, create, loop, self.serializer)
-        (_transport, protocol) = loop.run_until_complete(coro)
+        _transport, self.protocol = await start_wamp_session(self.url, create, self.loop, self.serializer)
+     
         
-        try:
-            try:
-                loop.run_forever()
-            except KeyboardInterrupt:
-                pass
-            self.log.debug('Left main loop waiting for completion')
-            # give Goodbye message a chance to go through, if we still
-            # have an active session
-            # it's not working now - because protocol is_closed must return Future
-            if protocol._session:
-                loop.run_until_complete(protocol._session.leave())
-        finally:
-            loop.close()
+    async def stop(self):
+        # give Goodbye message a chance to go through, if we still
+        # have an active session
+        # it's not working now - because protocol is_closed must return Future
+        if self.protocol._session:
+            await self.protocol._session.leave()
+        
