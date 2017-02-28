@@ -2,10 +2,10 @@ import asyncio
 import logging
 from asexor.api import AbstractTaskContext, AbstractBackend
 from asexor.config import Config, ConfigError
+from asexor.message import CallMessage, ErrorMessage, ReplyMessage, UpdateMessage
 from collections import defaultdict
 from aiohttp import web
 import aiohttp
-import json
 import traceback
 from copy import copy
 
@@ -27,8 +27,7 @@ class CallContext(AbstractTaskContext):
         self.call_id = call_id
 
     def _send(self, data):
-        self._ws.send_json(
-            {'t': 'm', 'call_id': self.call_id, 'data': data})
+        self._ws.send_str(UpdateMessage(self.call_id, data).as_json())
 
 
     def notify_start(self, task_id):
@@ -95,43 +94,25 @@ class AsexorBackendSession:
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     logger.debug('Received message %s', msg.data)
-                    data = msg.json()
-                    call_id = data.get('call_id')
-                    if not call_id:
-                        logger.error('Message do not have call_id')
+                    try:
+                        call = CallMessage.from_json(msg.data)
+                    except Exception as e:
+                        if hasattr(e, 'call_id'):
+                            ws.send_str(ErrorMessage(e.call_id, str(e) or 'Invalid message').as_json())
+                        logger.exception('Invalid message %s', msg.data)
                         continue
-
-                    def send_error(error):
-                        ws.send_json(
-                            {'t': 'e', 'call_id': call_id, 'error': error})
-                    call_args = data.get('args', tuple())
-                    if not isinstance(call_args, (list, tuple)):
-                        send_error('args must be an array/list')
-                        continue
-                    if len(call_args) < 1:
-                        send_error('task name argument is mandatory')
-                        continue
-                    task_name = call_args[0]
-                    call_kwargs = data.get('kwargs', {})
-                    if not isinstance(call_kwargs, dict):
-                        send_error('kwargs must be a dict/object')
-                        continue
-
-                    ctx = CallContext(call_id, ws)
+                    ctx = CallContext(call.call_id, ws)
                     try:
                         task_id = self.schedule_task(
-                            ctx, user, role, task_name, *call_args[1:], **call_kwargs)
-                        res = {
-                            't': 'r', 'call_id': call_id, 'returned': task_id}
+                            ctx, user, role, call.task_name, *call.args, **call.kwargs)
+                        res = ReplyMessage(call.call_id, task_id)
                         logger.debug('Sending respose: %s', res)
-                        ws.send_json(res)
+                        ws.send_str(res.as_json())
                     except Exception as e:
                         error = str(e)
                         tb = traceback.format_exc()
                         logger.exception('Task scheduling error')
-                        ws.send_json(
-                            {'t': 'e', 'call_id': call_id, 'error': error, 'error_stack_trace': tb})
-
+                        ws.send_str(ErrorMessage(call.call_id, error, error_stack=tb).as_json())
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     logger.error('ws connection closed with exception %s' %
                                  ws.exception())

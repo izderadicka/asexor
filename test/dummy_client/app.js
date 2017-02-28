@@ -89,6 +89,9 @@ let startApp = function() {
 	      case 'sleep':
 	        args=[parseInt($('#sleep-time').val())]
 	        break;
+				case 'invalid':
+					args='dummy';
+					kwargs = 'usak';
 	    };
 
 	    client.exec(selected, args, kwargs).then(
