@@ -38,7 +38,9 @@ class AsexorClient(AbstractClient):
         if not self.active:
             raise RuntimeError('WebSocket is closed')
         call_id = self._next_call_id
-        self._ws.send_json({'call_id': call_id, 'args': [remote_name]+list(args), 'kwargs': kwargs})
+        msg = {'call_id': call_id, 'args': [remote_name]+list(args), 'kwargs': kwargs}
+        logger.debug('Message send: %s', msg)
+        self._ws.send_json(msg)
         
         fut = self.loop.create_future()
         self._pending_calls[call_id]=fut
@@ -59,6 +61,7 @@ class AsexorClient(AbstractClient):
                     if msg.type == aiohttp.WSMsgType.TEXT:
                         try:
                             data = msg.json()
+                            logger.debug('Message received: %s', data)
                         except Exception:
                             logger.exception('Invalid message')
                             continue
