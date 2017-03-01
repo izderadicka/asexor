@@ -9,7 +9,7 @@ from autobahn.asyncio.rawsocket import WampRawSocketClientFactory
 from autobahn.wamp.types import ComponentConfig
 from urllib.parse import urlparse
 
-log = logging.getLogger('wamp_backend')
+logger = logging.getLogger('wamp_backend')
 
 
 class CallContext(AbstractTaskContext):
@@ -17,36 +17,21 @@ class CallContext(AbstractTaskContext):
     def __init__(self, session, caller=None):
         self._session = session
         self._caller = caller
-
-    def _options(self):
         if Config.LIMIT_PUBLISH_BY == 'SESSION'  and self._caller:
-            return PublishOptions(eligible=[self._caller])
+            self._options = PublishOptions(eligible=[self._caller])
+            # return PublishOptions(eligible_authid=[task_user]
         elif not Config.LIMIT_PUBLISH_BY:
-            return None
-
-        raise ConfigError('Invalid configuration for LIMIT_PUBLISH_BY')
-
-        # return PublishOptions(eligible_authid=[task_user]
-
-    def notify_start(self, task_id,):
-        self._session.publish(Config.UPDATE_CHANNEL, task_id, status='started',
-                              options=self._options())
-
-    def notify_success(self, task_id, res, duration):
-        self._session.publish(Config.UPDATE_CHANNEL, task_id,
-                              status='success', result=res, duration=duration,
-                              options=self._options())
+            self._options = None
+        else:
+            raise ConfigError('Invalid configuration for LIMIT_PUBLISH_BY')
         
-    def notify_progress(self, task_id, progress):
-        self._session.publish(Config.UPDATE_CHANNEL, task_id,
-                              status='progress', progress=progress,
-                              options=self._options())
-
-    def notify_error(self, task_id, err, duration):
-        self._session.publish(Config.UPDATE_CHANNEL, task_id,
-                              status='error', error=str(err) or repr(err), duration=duration,
-                              options=self._options())
-
+    def send(self, task_id, **kwargs):
+        kwargs['options'] = self._options
+        try:
+            self._session.publish(Config.UPDATE_CHANNEL, task_id, **kwargs)
+        except Exception:
+            logger.exception('WAMP publish failed')
+            
 
 class AsexorBackendSession(ApplicationSession):
     
@@ -55,7 +40,7 @@ class AsexorBackendSession(ApplicationSession):
         self.tasks=tasks_queue
 
     async def onJoin(self, details):
-        log.info('started session with details %s', details)
+        logger.info('started session with details %s', details)
         if Config.AUTHENTICATION_PROCEDUTE and Config.AUTHENTICATION_PROCEDURE_NAME:
             self.register(Config.AUTHENTICATION_PROCEDUTE, Config.AUTHENTICATION_PROCEDURE_NAME)
         if Config.AUTHORIZATION_PROCEDURE and Config.AUTHORIZATION_PROCEDURE_NAME:
@@ -63,7 +48,7 @@ class AsexorBackendSession(ApplicationSession):
             
 
         def run_task(task_name, *args, **kwargs):
-            log.debug(
+            logger.debug(
                 'Request for run task %s %s %s', task_name, args, kwargs)
             details = kwargs.pop('__call_details__', None)
             if not details:
@@ -86,12 +71,11 @@ class AsexorBackendSession(ApplicationSession):
         except Exception as e:
             # ignore exception caused by closing loop
             if not asyncio.get_event_loop().is_closed():
-                log.exception(e)
+                logger.exception(e)
 
     def onDisconnect(self):
-        log.warn('Disconnected')
-        #TODO: is below needed?
-        asyncio.get_event_loop().stop()
+        logger.warn('Disconnected')
+        
         
 
 @asyncio.coroutine # is coroutine because returns coroutine
@@ -156,7 +140,7 @@ class WampAsexorBackend(AbstractBackend):
             try:
                 session = AsexorBackendSession(cfg, tasks_queue)
             except Exception:
-                log.exception("App session could not be created! ")
+                logger.exception("App session could not be created! ")
                 asyncio.get_event_loop().stop()
             else:
                 return session

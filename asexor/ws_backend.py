@@ -26,32 +26,12 @@ class CallContext(AbstractTaskContext):
         self._ws = ws
         self.call_id = call_id
 
-    def _send(self, data):
-        self._ws.send_str(UpdateMessage(self.call_id, data).as_json())
-
-
-    def notify_start(self, task_id):
-        self._send({'task_id': task_id,
-                           'status': 'started'})
-
-    def notify_success(self, task_id, res, duration):
-        self._send({'task_id': task_id,
-                           'status': 'success',
-                           'result': res, 'duration': duration
-                           })
-
-    def notify_error(self, task_id, err, duration):
-        self._send({'task_id': task_id,
-                           'status': 'error',
-                           'error': str(err) or repr(err),
-                           'duration': duration,
-                           })
-
-    def notify_progress(self, task_id, progress, task_context=None):
-        self._send({'task_id': task_id,
-                           'status': 'progress',
-                           'progress': progress,
-                           })
+    def send(self, task_id, **kwargs):
+        kwargs['task_id']=task_id
+        try:
+            self._ws.send_str(UpdateMessage(self.call_id, kwargs).as_json())
+        except Exception:
+            logger.exception('WS send failed')
 
 
 class AsexorBackendSession:

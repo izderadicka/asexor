@@ -8,50 +8,53 @@ FRAME_TYPE_DATA = 0
 FRAME_TYPE_PING = 1
 FRAME_TYPE_PONG = 2
 
+MAX_FRAME_SIZE = 16 # MB
+
 
 class PrefixProtocol(asyncio.Protocol):
 
     prefix_format = '!L'
     prefix_length = struct.calcsize(prefix_format)
-    max_length = 16 * 1024 * 1024
+    max_length = MAX_FRAME_SIZE * 1024 * 1024
     max_length_send = max_length
-    log = txaio.make_logger()  # @UndefinedVariable
-
+    
+    def __init__(self, loop=None):
+        self.loop = loop or asyncio.get_event_loop()
+   
     def connection_made(self, transport):
         self.transport = transport
         peer = transport.get_extra_info('peername')
-        self.log.debug('RawSocker Asyncio: Connection made with peer {peer}', peer=peer)
+        logger.debug('Connection made with peer {peer}', peer=peer)
         self._buffer = b''
         self._header = None
-        self._wait_closed = asyncio.Future()
+        self._wait_closed = self.loop.create_future()
 
-    @property
-    def is_closed(self):
+    
+    async def wait_closed(self):
         if hasattr(self, '_wait_closed'):
-            return self._wait_closed
-        else:
-            f = asyncio.Future()
-            f.set_result(True)
-            return f
+            await self._wait_closed
 
     def connection_lost(self, exc):
-        self.log.debug('RawSocker Asyncio: Connection lost')
+        logger.debug('Connection lost')
         self.transport = None
         self._wait_closed.set_result(True)
-        self._on_connection_lost(exc)
 
-    def _on_connection_lost(self, exc):
-        pass
 
     def protocol_error(self, msg):
-        self.log.error(msg)
+        logger.error(msg)
         self.transport.close()
 
-    def sendString(self, data):
+    def send(self, data, frame_type=0):
+        
         l = len(data)
         if l > self.max_length_send:
             raise ValueError('Data too big')
         header = struct.pack(self.prefix_format, len(data))
+        if frame_type:
+            b = bytearray(header)
+            b[0] = b[0] | frame_type
+            header = bytes(b)
+            header = header[0]
         self.transport.write(header)
         self.transport.write(data)
 
@@ -89,7 +92,7 @@ class PrefixProtocol(asyncio.Protocol):
                 remaining -= frame_length
 
                 if frame_type == FRAME_TYPE_DATA:
-                    self.stringReceived(data)
+                    self.frame_received(data)
                 elif frame_type == FRAME_TYPE_PING:
                     self.ping(data)
                 elif frame_type == FRAME_TYPE_PONG:
@@ -101,5 +104,5 @@ class PrefixProtocol(asyncio.Protocol):
 
         self._buffer = self._buffer[:remaining]
 
-    def stringReceived(self, data):
+    def frame_received(self, data):
         raise NotImplementedError()

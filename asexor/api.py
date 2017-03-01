@@ -8,22 +8,22 @@ class AbstractTaskContext(ABC):
     """
     Adapts backend session fro purpose of :class:`asexor.tqueue.TasksQueue`
     """
-
+    
     @abstractmethod
-    def notify_start(self, task_id):
+    def send(self, task_id, **kwargs):
         pass
 
-    @abstractmethod
+    def notify_start(self, task_id,):
+        self.send(task_id, status='started')
+
     def notify_success(self, task_id, res, duration):
-        pass
-
-    @abstractmethod
+        self.send(task_id, status='success', result=res, duration=duration)
+        
     def notify_progress(self, task_id, progress):
-        pass
+        self.send(task_id, status='progress', progress=progress)
 
-    @abstractmethod
     def notify_error(self, task_id, err, duration):
-        pass
+        self.send(task_id, status='error', error=str(err) or repr(err), duration=duration)
 
 
 class AbstractBackend(ABC):
