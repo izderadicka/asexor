@@ -3,6 +3,8 @@ import logging
 from asexor.api import AbstractTaskContext, AbstractBackend
 from asexor.config import Config, ConfigError
 from asexor.message import CallMessage, ErrorMessage, ReplyMessage, UpdateMessage
+from asexor.utils import asure_coro_fn
+from asexor.tqueue import TaskSchedulerMixin
 from collections import defaultdict
 from aiohttp import web
 import aiohttp
@@ -11,14 +13,6 @@ from copy import copy
 
 logger = logging.getLogger('ws_backend')
 
-
-def assure_coro_fn(fn_or_coro):
-    if asyncio.iscoroutinefunction(fn_or_coro):
-        return fn_or_coro
-    elif callable(fn_or_coro):
-        return asyncio.coroutine(fn_or_coro)
-    else:
-        raise ValueError('Parameter is not method, function or coroutine')
 
 class CallContext(AbstractTaskContext):
 
@@ -34,12 +28,12 @@ class CallContext(AbstractTaskContext):
             logger.exception('WS send failed')
 
 
-class AsexorBackendSession:
+class AsexorBackendSession(TaskSchedulerMixin):
 
     def __init__(self, tasks_queue, loop=None):
-        if not Config.WS_AUTHENTICATION_PROCEDUTE:
-            raise ConfigError('WS_AUTHENTICATION_PROCEDUTE is missing')
-        self.autheticator = assure_coro_fn(Config.WS_AUTHENTICATION_PROCEDUTE)
+        if not Config.WS.AUTHENTICATION_PROCEDURE:
+            raise ConfigError('WS.AUTHENTICATION_PROCEDURE is missing')
+        self.autheticator = asure_coro_fn(Config.WS.AUTHENTICATION_PROCEDURE)
         self.websockets = defaultdict(set)
         self.handlers = defaultdict(set)
         self.tasks = tasks_queue
@@ -89,7 +83,7 @@ class AsexorBackendSession:
                         logger.debug('Sending respose: %s', res)
                         ws.send_str(res.as_json())
                     except Exception as e:
-                        error = str(e)
+                        error = str(e) or repr(e)
                         tb = traceback.format_exc()
                         logger.exception('Task scheduling error')
                         ws.send_str(ErrorMessage(call.call_id, error, error_stack=tb).as_json())
@@ -103,19 +97,6 @@ class AsexorBackendSession:
             self.websockets[user].remove(ws)
             self.handlers[user].remove(asyncio.Task.current_task())
         return ws
-
-    def schedule_task(self, ctx, user, role, task_name, *args, **kwargs):
-        logger.debug(
-            'Request for run task %s %s %s', task_name, args, kwargs)
-
-        task_priority = Config.DEFAULT_PRIORITY
-        if role:
-            task_priority = Config.PRIORITY_MAP.get(
-                role, Config.DEFAULT_PRIORITY)
-        task_id = self.tasks.add_task(
-            task_name, args, kwargs, task_priority, authenticated_user=user,
-            task_context=ctx)
-        return task_id
 
     async def close_all_websockets(self, *args, **kwargs):
         code = kwargs.get('code', aiohttp.WSCloseCode.SERVICE_RESTART)

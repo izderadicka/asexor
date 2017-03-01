@@ -34,7 +34,7 @@ class WampAsexorClient(AbstractClient):
             logger.debug('Session joined %s', details)
     
             await self.subscribe(
-                self.on_task_update, Config.UPDATE_CHANNEL)
+                self.on_task_update, Config.WAMP.UPDATE_CHANNEL)
             
             if self._on_ready:
                 self._on_ready()
@@ -59,7 +59,7 @@ class WampAsexorClient(AbstractClient):
         self.url = url
         
     async def execute(self, task_name, *args, **kwargs):
-        task_id = await self.session.call(Config.RUN_TASK_PROC, task_name, *args, **kwargs)
+        task_id = await self.session.call(Config.WAMP.RUN_TASK_PROC, task_name, *args, **kwargs)
         return task_id
     
             

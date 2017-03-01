@@ -5,6 +5,7 @@ from autobahn.asyncio.wamp import ApplicationSession
 from autobahn.wamp.types import PublishOptions, RegisterOptions
 from asexor.api import AbstractTaskContext, AbstractBackend
 from asexor.config import Config, ConfigError
+from asexor.tqueue import TaskSchedulerMixin
 from autobahn.asyncio.rawsocket import WampRawSocketClientFactory
 from autobahn.wamp.types import ComponentConfig
 from urllib.parse import urlparse
@@ -17,10 +18,10 @@ class CallContext(AbstractTaskContext):
     def __init__(self, session, caller=None):
         self._session = session
         self._caller = caller
-        if Config.LIMIT_PUBLISH_BY == 'SESSION'  and self._caller:
+        if Config.WAMP.LIMIT_PUBLISH_BY == 'SESSION'  and self._caller:
             self._options = PublishOptions(eligible=[self._caller])
             # return PublishOptions(eligible_authid=[task_user]
-        elif not Config.LIMIT_PUBLISH_BY:
+        elif not Config.WAMP.LIMIT_PUBLISH_BY:
             self._options = None
         else:
             raise ConfigError('Invalid configuration for LIMIT_PUBLISH_BY')
@@ -28,12 +29,12 @@ class CallContext(AbstractTaskContext):
     def send(self, task_id, **kwargs):
         kwargs['options'] = self._options
         try:
-            self._session.publish(Config.UPDATE_CHANNEL, task_id, **kwargs)
+            self._session.publish(Config.WAMP.UPDATE_CHANNEL, task_id, **kwargs)
         except Exception:
             logger.exception('WAMP publish failed')
             
 
-class AsexorBackendSession(ApplicationSession):
+class AsexorBackendSession(ApplicationSession, TaskSchedulerMixin):
     
     def __init__(self, config, tasks_queue):
         super(AsexorBackendSession, self).__init__(config)
@@ -41,10 +42,10 @@ class AsexorBackendSession(ApplicationSession):
 
     async def onJoin(self, details):
         logger.info('started session with details %s', details)
-        if Config.AUTHENTICATION_PROCEDUTE and Config.AUTHENTICATION_PROCEDURE_NAME:
-            self.register(Config.AUTHENTICATION_PROCEDUTE, Config.AUTHENTICATION_PROCEDURE_NAME)
-        if Config.AUTHORIZATION_PROCEDURE and Config.AUTHORIZATION_PROCEDURE_NAME:
-            self.register(Config.AUTHORIZATION_PROCEDURE, Config.AUTHORIZATION_PROCEDURE_NAME)
+        if Config.WAMP.AUTHENTICATION_PROCEDURE and Config.WAMP.AUTHENTICATION_PROCEDURE_NAME:
+            self.register(Config.WAMP.AUTHENTICATION_PROCEDURE, Config.WAMP.AUTHENTICATION_PROCEDURE_NAME)
+        if Config.WAMP.AUTHORIZATION_PROCEDURE and Config.WAMP.AUTHORIZATION_PROCEDURE_NAME:
+            self.register(Config.WAMP.AUTHORIZATION_PROCEDURE, Config.WAMP.AUTHORIZATION_PROCEDURE_NAME)
             
 
         def run_task(task_name, *args, **kwargs):
@@ -54,24 +55,13 @@ class AsexorBackendSession(ApplicationSession):
             if not details:
                 raise RuntimeError('Call details not available')
             role = details.caller_authrole
-            authid = details.caller_authid
-            task_priority = Config.DEFAULT_PRIORITY
-            if role:
-                task_priority = Config.PRIORITY_MAP.get(
-                    role, Config.DEFAULT_PRIORITY)
-            task_id = self.tasks.add_task(
-                task_name, args, kwargs, task_priority, authenticated_user=authid, 
-                task_context=CallContext(self, details.caller))
+            user = details.caller_authid
+            ctx = CallContext(self, details.caller)
+            task_id = self.schedule_task(ctx, user, role, task_name, *args, **kwargs)
             return task_id
-        self.register(run_task, Config.RUN_TASK_PROC, RegisterOptions(
+        self.register(run_task, Config.WAMP.RUN_TASK_PROC, RegisterOptions(
             details_arg='__call_details__'))
 
-        try:
-            await self.tasks.run_tasks()
-        except Exception as e:
-            # ignore exception caused by closing loop
-            if not asyncio.get_event_loop().is_closed():
-                logger.exception(e)
 
     def onDisconnect(self):
         logger.warn('Disconnected')

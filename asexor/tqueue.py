@@ -3,7 +3,7 @@ import uuid
 from collections import namedtuple
 from asexor.task import get_task, BaseMultiTask, BaseSimpleTask
 from multiprocessing import cpu_count
-from asexor.config import NORMAL_PRIORITY
+from asexor.config import NORMAL_PRIORITY, Config
 import logging
 import time
 
@@ -12,6 +12,23 @@ logger = logging.getLogger('tqueue')
 TaskInfo = namedtuple(
     'TaskInfo', ['id', 'task', 'args', 'kwargs', 'context', 'multitask', 'task_no', 'total_tasks'])
 
+class TaskSchedulerMixin:
+    """
+    To be used within classes that have self.tasks as instance of TasksQueue
+    """
+    
+    def schedule_task(self, ctx, user, role, task_name, *args, **kwargs):
+        logger.debug(
+            'Request for run task %s %s %s', task_name, args, kwargs)
+
+        task_priority = Config.DEFAULT_PRIORITY
+        if role:
+            task_priority = Config.PRIORITY_MAP.get(
+                role, Config.DEFAULT_PRIORITY)
+        task_id = self.tasks.add_task(
+            task_name, args, kwargs, task_priority, authenticated_user=user,
+            task_context=ctx)
+        return task_id
 
 class TasksQueue():
 

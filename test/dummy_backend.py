@@ -25,8 +25,8 @@ def dummy_authorize(session, uri, action):
     log.debug("Authorizing uri {} for  {}, session={})".format(
         uri, action, session))
 
-    if (uri == Config.UPDATE_CHANNEL and action == 'subscribe') or \
-       (uri == Config.RUN_TASK_PROC and action == 'call'):
+    if (uri == Config.WAMP.UPDATE_CHANNEL and action == 'subscribe') or \
+       (uri == Config.WAMP.RUN_TASK_PROC and action == 'call'):
         return {"allow": True, "disclose": True, "cache": True}
 
     return False
@@ -67,18 +67,18 @@ if __name__ == '__main__':
     client_dir = os.path.join(curr_dir, 'dummy_client')
     
     # basic code to start aiohttp WS ASEXOR backend
-    Config.WS_AUTHENTICATION_PROCEDUTE = dummy_authenticate_simple
+    Config.WS.AUTHENTICATION_PROCEDURE = dummy_authenticate_simple
     protocols =[(WsAsexorBackend, {'port':8484, 'static_dir':client_dir})]
     
         
     if opts.use_wamp:
         # basic code to start WAMP ASEXOR backend
         from asexor.wamp_backend import WampAsexorBackend
-        Config.AUTHENTICATION_PROCEDUTE = dummy_authenticate
-        Config.AUTHENTICATION_PROCEDURE_NAME = "eu.zderadicka.dummy_authenticate"
+        Config.WAMP.AUTHENTICATION_PROCEDURE = dummy_authenticate
+        Config.WAMP.AUTHENTICATION_PROCEDURE_NAME = "eu.zderadicka.dummy_authenticate"
     
-        Config.AUTHORIZATION_PROCEDURE = dummy_authorize
-        Config.AUTHORIZATION_PROCEDURE_NAME = "eu.zderadicka.dummy_authorize"
+        Config.WAMP.AUTHORIZATION_PROCEDURE = dummy_authorize
+        Config.WAMP.AUTHORIZATION_PROCEDURE_NAME = "eu.zderadicka.dummy_authorize"
         
         
     
