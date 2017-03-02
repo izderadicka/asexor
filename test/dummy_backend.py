@@ -13,6 +13,7 @@ log = logging.getLogger('ws_server')
 # dummy authentication -  token is basically username
 def dummy_authenticate_simple(token):
     log.debug('Authenticating user with token %s', token)
+    user = token if isinstance(token, str) else token.decode('utf-8')
     return token, 'user'
 
 # WAMP requires different  authentication function and authorize function
@@ -54,6 +55,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '-d', '--debug', action='store_true', help='enable debug',)
     parser.add_argument('--use-wamp', action='store_true', help='Use WAMP protocol - requires WAMP router(crossbar.io) to be running')
+    parser.add_argument('--use-raw', action='store_true', help="Use raw socket protocol")
     opts = parser.parse_args()
     loop = asyncio.get_event_loop()
     if opts.debug:
@@ -84,6 +86,11 @@ if __name__ == '__main__':
     
         path = os.path.join(os.path.dirname(__file__), '.crossbar/socket1')
         protocols.append((WampAsexorBackend, {'url':path, 'realm': u"realm1",}))
+        
+    if opts.use_raw:
+        from asexor.raw_backend import RawSocketAsexorBackend
+        Config.RAW.AUTHENTICATION_PROCEDURE = dummy_authenticate_simple
+        protocols.append((RawSocketAsexorBackend, {'url':'tcp://0.0.0.0:8485'}))
 
         
     runner = Runner(protocols)

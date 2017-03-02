@@ -49,6 +49,7 @@ class WampAsexorClient(AbstractClient):
     
         def onDisconnect(self):
             logger.debug('Disconnected')
+            
         
         
     def __init__(self, url, realm, user, token, loop=None):

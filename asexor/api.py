@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod, abstractproperty
+from asexor.message import CallMessage, ErrorMessage, ReplyMessage, UpdateMessage
 
 logger = logging.getLogger('api')
 
@@ -73,7 +74,18 @@ class AbstractClient(ABC):
                 logger.exception('Error when processing task update notification')
         
     async def start(self):
-        self._task = self.loop.create_task(self.run())
+        async def safe_run():
+            try:
+                await self.run()
+            except GeneratorExit:
+                pass
+            except (asyncio.CancelledError, KeyboardInterrupt):
+                raise
+            except:
+                logger.exception('Client session error')
+                self.loop.stop()
+                
+        self._task = self.loop.create_task(safe_run())
         await self._ready
         
     async def stop(self):
@@ -114,4 +126,78 @@ class AbstractClient(ABC):
     def active(self):
         pass
         
+class RemoteError(Exception):
+    def __init__(self, msg, remote_stack_trace):
+        self.message = msg
+        self.remote_stack_trace = remote_stack_trace
+        
+    def __str__(self):
+        return self.message +'\n' + self.remote_stack_trace    
+
+class AbstractClientWithCallMatch(AbstractClient):
+    """Client bases class that matches calls with responses"""
     
+    def __init__(self, loop=None):
+        AbstractClient.__init__(self, loop)
+        self._call_id = 1
+        self._pending_calls = dict()
+        
+    @property
+    def _next_call_id(self):
+        cid = self._call_id
+        self._call_id+=1
+        return cid
+
+    @property    
+    def active(self):
+        return bool(self._ws and not self._ws.closed)
+    
+    @asyncio.coroutine  # It is coroutine - returns future       
+    def execute(self, remote_name, *args, **kwargs):
+        if not self.active:
+            raise RuntimeError('WebSocket is closed')
+        call_id = self._next_call_id
+        msg = CallMessage(call_id, remote_name, args, kwargs)
+        logger.debug('Message send: %s', msg)
+        self.send_msg(msg)
+        
+        fut = self.loop.create_future()
+        self._pending_calls[call_id]=fut
+        return fut
+    
+    @abstractmethod
+    def send_msg(self, msg):
+        pass
+        
+    
+    # should be used n run method                
+    async def process_msg(self, msg_data, deserializer):
+        def get_call_future(resp): 
+            try:
+                fut = self._pending_calls.pop(resp.call_id)
+                return fut
+            except KeyError:
+                logger.error('Unmached response %s', resp)
+                
+        try:
+            response = deserializer(msg_data)
+            logger.debug('Message received: %s', response)
+        except Exception:
+            logger.exception('Invalid message')
+            return
+        
+        if isinstance(response, ReplyMessage):
+            fut = get_call_future(response)
+            if fut:
+                fut.set_result(response.task_id)
+        elif isinstance(response, ErrorMessage):
+            fut = get_call_future(response)
+            if fut:
+                fut.set_exception(RemoteError(response.error, response.error_stack_trace))
+                
+        elif isinstance(response,UpdateMessage):
+            res = response.data
+            assert('status' in res and 'task_id' in res)
+            await self.update_listeners(**res)
+        else:
+            logger.error("Invalid message type")

@@ -20,24 +20,30 @@ class PrefixProtocol(asyncio.Protocol):
     
     def __init__(self, loop=None):
         self.loop = loop or asyncio.get_event_loop()
+        self._wait_closed = self.loop.create_future()
    
     def connection_made(self, transport):
         self.transport = transport
         peer = transport.get_extra_info('peername')
-        logger.debug('Connection made with peer {peer}', peer=peer)
+        logger.debug('Connection made with peer %s',peer)
         self._buffer = b''
         self._header = None
-        self._wait_closed = self.loop.create_future()
+        self.on_connected()
+        
+    def on_connected(self):
+        pass
 
-    
     async def wait_closed(self):
-        if hasattr(self, '_wait_closed'):
-            await self._wait_closed
+        await self._wait_closed
 
     def connection_lost(self, exc):
-        logger.debug('Connection lost')
+        logger.debug('Connection lost: %s', exc)
         self.transport = None
         self._wait_closed.set_result(True)
+        self.on_disconnected(was_error=bool(exc))
+        
+    def on_disconnected(self, was_error):
+        pass
 
 
     def protocol_error(self, msg):

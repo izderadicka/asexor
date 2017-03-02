@@ -4,9 +4,10 @@ from asexor.message import CallMessage, ErrorMessage, ReplyMessage, UpdateMessag
 from asexor.utils import asure_coro_fn
 from asexor.config import Config, ConfigError
 from asexor.tqueue import TaskSchedulerMixin
-from asexor.api import AbstractTaskContext
+from asexor.api import AbstractTaskContext, AbstractBackend
 import logging
 import traceback
+from urllib.parse import urlparse
 
 logger = logging.getLogger('raw_backend')
 
@@ -75,8 +76,10 @@ class AsexorBackendSession(PrefixProtocol, TaskSchedulerMixin):
             self.transport.close()
             
         else:
+            logger.debug('Authentication success, user is %s, role is %s', user, role)
             self.user = user
             self.role = role
+            self.send(HS_CODE_OK)
             self._handshake = self.HS_DONE
             
     async def process_message(self, call): 
@@ -94,4 +97,25 @@ class AsexorBackendSession(PrefixProtocol, TaskSchedulerMixin):
             self.send(ErrorMessage(call.call_id, error, error_stack=tb).as_binary())
         
         
+
+class RawSocketAsexorBackend(AbstractBackend):   
+    def __init__(self, loop, url): 
+        super(RawSocketAsexorBackend, self).__init__(loop)   
+        self.url = url
+        
+    async def start(self, tasks_queue):
+        parsed_url = urlparse(self.url)
+        fact = lambda: AsexorBackendSession(tasks_queue, self.loop)
+        
+        if parsed_url.scheme =='tcp':
+            coro=self.loop.create_server(fact,
+                                    host=parsed_url.hostname, port=parsed_url.port)
+        elif parsed_url.scheme =='unix' or parsed_url.scheme == '':
+            coro = self.loop.create_unix_server(fact, path= parsed_url.path)
             
+        self.server = await coro
+        
+        
+    async def stop(self):
+        self.server.close()
+        await self.server.wait_closed()

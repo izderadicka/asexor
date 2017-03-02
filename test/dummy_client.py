@@ -2,10 +2,12 @@ import aiohttp
 import asyncio
 import logging
 import argparse
+import sys
 from collections import defaultdict, deque
 import random
 from asexor.ws_client import AsexorClient
 from asexor.wamp_client import WampAsexorClient
+from asexor.raw_client import RawSocketAsexorClient
 
 logger = logging.getLogger('dummy_client')
 
@@ -66,7 +68,7 @@ class MyClient():
         async def log_updates(task_id, status=None, **kwargs):
             # first update any pending updates
             # self._process_pending()
-            logger.info(
+            logger.debug(
                 'Update for task %s, status = %s, details= %s', task_id, status, kwargs)
             if task_id in self._tasks_table:
                 self._update_task(task_id, status, kwargs)
@@ -79,7 +81,7 @@ class MyClient():
         for i in range(self.count):
             task_name, args, kwargs = random.choice(TASKS)
             task_id = await self.session.execute(task_name, *args, **kwargs)
-            logger.info('Task submitted with id=%s', task_id)
+            logger.debug('Task submitted with id=%s', task_id)
             self._tasks_table[task_id]['status'] = 'sent'
 
         # in case notification came before task result (possible due to async
@@ -96,6 +98,7 @@ if __name__ == '__main__':
         '-d', '--debug', action='store_true', help='enable debug')
     parser.add_argument('-n', '--number', type=int, default=10, help="number of remote calls")
     parser.add_argument('--use-wamp', action='store_true', help='Use WAMP protocol - requires WAMP router(crossbar.io) to be running')
+    parser.add_argument('--use-raw', action='store_true', help="Use raw socket protocol")
     opts = parser.parse_args()
     loop = asyncio.get_event_loop()
     level = logging.INFO
@@ -107,9 +110,16 @@ if __name__ == '__main__':
     
     if opts.use_wamp:
         session = WampAsexorClient("tcp://localhost:9090",  u"realm1", 'ivan', 'ivan', loop=loop)
+    elif opts.use_raw:
+        session = RawSocketAsexorClient('tcp://localhost:8485', 'ivan', loop)
     else:
         session = AsexorClient('http://localhost:8484/ws', 'ivan', loop)
-    loop.run_until_complete(session.start())
+    try:
+        loop.run_until_complete(session.start())
+    except:
+        logger.error('Preliminary exited')
+        loop.run_until_complete(session.stop())
+        sys.exit(1)
     client =  MyClient(opts.number or 10, session, loop)
     loop.run_until_complete(client.run())
     loop.run_until_complete(session.stop())
