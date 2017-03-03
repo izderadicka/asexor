@@ -1,6 +1,9 @@
+aiohttp>=1.3.2
+cbor>=1.0.0
+ujson>=1.35
+# you can ommit these two below if WAMP protocol support is not needed
 autobahn>=0.14.1
 crossbar>=0.14.0
-aiohttp>=1.3.2
 
 
 #development requirements

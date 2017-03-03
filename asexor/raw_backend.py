@@ -109,11 +109,13 @@ class RawSocketAsexorBackend(AbstractBackend):
         
         if parsed_url.scheme =='tcp':
             coro=self.loop.create_server(fact,
-                                    host=parsed_url.hostname, port=parsed_url.port)
+                                    host=parsed_url.hostname, port=parsed_url.port,
+                                    backlog = 128)
         elif parsed_url.scheme =='unix' or parsed_url.scheme == '':
             coro = self.loop.create_unix_server(fact, path= parsed_url.path)
             
         self.server = await coro
+        logger.info('Raw backend started on %s', self.url)
         
         
     async def stop(self):

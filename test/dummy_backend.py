@@ -88,9 +88,15 @@ if __name__ == '__main__':
         protocols.append((WampAsexorBackend, {'url':path, 'realm': u"realm1",}))
         
     if opts.use_raw:
+        path = '/tmp/asexor-test.socket'
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        url = 'tcp://0.0.0.0:8485'
         from asexor.raw_backend import RawSocketAsexorBackend
         Config.RAW.AUTHENTICATION_PROCEDURE = dummy_authenticate_simple
-        protocols.append((RawSocketAsexorBackend, {'url':'tcp://0.0.0.0:8485'}))
+        protocols.append((RawSocketAsexorBackend, {'url': url}))
 
         
     runner = Runner(protocols)

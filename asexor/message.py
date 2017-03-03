@@ -80,6 +80,45 @@ class CallMessage(Message):
             else:
                 e.call_id = call_id
             raise e
+        
+class DelegatedCallMessage(CallMessage):
+    def __init__(self, call_id, task_name, args=(), kwargs={}, user=None, role=None):
+        super().__init__(call_id, task_name, args=args, kwargs=kwargs)
+        self.user = user
+        self.role = role
+        
+    def as_data(self):
+        payload = {}
+        if self.args:
+            payload['args'] = self.args
+        if self.kwargs:
+            payload['kwargs'] = self.kwargs
+        if self.user:
+            payload['user'] = self.user
+        if self.role:
+            payload['role'] = self.role    
+        
+        return (self.call_id, self.task_name, payload)
+    
+    @classmethod
+    def from_data(cls, data):
+        try:
+            call_id, task_name, payload = data
+            args = payload.get('args') or ()
+            kwargs = payload.get('kwargs') or {}
+            user = payload.get('user')
+            role = payload.get('role')
+            return CallMessage(call_id, task_name, args, kwargs, user, role)
+        except Exception as e:
+            try:
+                call_id = data[0]
+            except:
+                pass
+            else:
+                e.call_id = call_id
+            raise e
+        
+        
     
 MSG_TYPE_REPLY = 'r'
 MSG_TYPE_UPDATE = 'm';

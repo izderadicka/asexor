@@ -21,6 +21,7 @@ class RawSocketAsexorClient(AbstractClientWithCallMatch):
             self._on_ready = on_ready
             
         def on_connected(self):
+            logger.debug('Transport buffer: %s', self.transport.get_write_buffer_limits())
             self.send(self.token)
             
         def frame_received(self, data):

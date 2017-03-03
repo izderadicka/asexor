@@ -17,7 +17,7 @@ TASKS = [('date', ('%d-%m-%Y %H:%M %Z',), {'utc': True}),
          ]
                 
 class MyClient():
-    def __init__(self, count, session, loop=None):
+    def __init__(self, count, time, session, loop=None):
         self.loop = loop or asyncio.get_event_loop()
         self._tasks_table = defaultdict(dict)
         self._pending_updates = deque()
@@ -25,6 +25,7 @@ class MyClient():
         self._all_done.add_done_callback(self._on_done)
         self.session = session
         self.count = count
+        self.time = time
 
     
 
@@ -79,7 +80,7 @@ class MyClient():
         self.session.subscribe(log_updates)
 
         for i in range(self.count):
-            task_name, args, kwargs = random.choice(TASKS)
+            task_name, args, kwargs = 'sleep', (self.time,), {}
             task_id = await self.session.execute(task_name, *args, **kwargs)
             logger.debug('Task submitted with id=%s', task_id)
             self._tasks_table[task_id]['status'] = 'sent'
@@ -96,9 +97,10 @@ if __name__ == '__main__':
     parser.add_argument('user', help="user id to join with")
     parser.add_argument(
         '-d', '--debug', action='store_true', help='enable debug')
-    parser.add_argument('-n', '--number', type=int, default=10, help="number of remote calls")
-    parser.add_argument('--use-wamp', action='store_true', help='Use WAMP protocol - requires WAMP router(crossbar.io) to be running')
-    parser.add_argument('--use-raw', action='store_true', help="Use raw socket protocol")
+    parser.add_argument('-n', '--number', type=int, default=10000, help="number of sleep tasks")
+    parser.add_argument('-t', '--time', type=int, default=10000, help="time is secs for each task to take")
+    
+    
     opts = parser.parse_args()
     loop = asyncio.get_event_loop()
     level = logging.INFO
@@ -108,21 +110,18 @@ if __name__ == '__main__':
     logging.basicConfig(level=level)
     
     
-    if opts.use_wamp:
-        session = WampAsexorClient("tcp://localhost:9090",  u"realm1", 'ivan', 'ivan', loop=loop)
-    elif opts.use_raw:
-        path = '/tmp/asexor-test.socket'
-        url = 'tcp://localhost:8485'
-        session = RawSocketAsexorClient(url, 'ivan', loop)
-    else:
-        session = AsexorClient('http://localhost:8484/ws', 'ivan', loop)
+    
+    path = '/tmp/asexor-test.socket'
+    url = 'tcp://localhost:8485'
+    session = RawSocketAsexorClient(url, 'ivan', loop)
+    
     try:
         loop.run_until_complete(session.start())
     except:
         logger.error('Preliminary exited')
         loop.run_until_complete(session.stop())
         sys.exit(1)
-    client =  MyClient(opts.number or 10, session, loop)
+    client =  MyClient(opts.number, opts.time, session, loop)
     loop.run_until_complete(client.run())
     loop.run_until_complete(session.stop())
     

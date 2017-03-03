@@ -12,12 +12,13 @@ class WampAsexorClient(AbstractClient):
     
     class WampClientSession(ApplicationSession):
 
-        def __init__(self,realm, user, token, update_handler, ready_cb):
+        def __init__(self,realm, user, token, update_handler, ready_cb, loop):
             ApplicationSession.__init__(self, config=ComponentConfig(realm=realm))
             self.user = user
             self.token = token
             self._on_update = update_handler
             self._on_ready = ready_cb
+            self.loop = loop
     
         def onConnect(self):
             logger.debug('Connected')
@@ -44,8 +45,12 @@ class WampAsexorClient(AbstractClient):
                 await self._on_update(task_id=task_id, status=status, **kwargs)
     
         def onLeave(self, details):
+            async def stop_loop():
+                self.loop.stop()
             logger.debug("Leaving session %s", details)
             self.disconnect()
+            self.loop.create_task(stop_loop())
+            
     
         def onDisconnect(self):
             logger.debug('Disconnected')
@@ -56,7 +61,7 @@ class WampAsexorClient(AbstractClient):
         AbstractClient.__init__(self, loop)
         self.session = WampAsexorClient.WampClientSession(realm, user, token, 
                                                        self.update_listeners,
-                                                       self.set_ready)
+                                                       self.set_ready, self.loop)
         self.url = url
         
     async def execute(self, task_name, *args, **kwargs):

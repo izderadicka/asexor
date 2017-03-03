@@ -24,7 +24,7 @@ class AsexorClient(AbstractClientWithCallMatch):
         self._ws.send_str(msg.as_json())
         
     async def run(self):
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(loop=self.loop) as session:
             async with session.ws_connect('%s?token=%s'% (self.url, self.token)) as self._ws:
                 self.set_ready()
                 async for msg in self._ws:
