@@ -1,7 +1,7 @@
 import asyncio
 from asexor.api import AbstractClientWithCallMatch
 from asexor.raw_socket import PrefixProtocol
-from asexor.message import msg_from_binary
+from asexor.message import msg_from_binary, DelegatedCallMessage
 import logging
 from urllib.parse import urlparse
 from inspect import CORO_CLOSED
@@ -68,4 +68,19 @@ class RawSocketAsexorClient(AbstractClientWithCallMatch):
         
         #await self._session.wait_closed()
             
+
+class DelegatedRawSocketAsexorClient(RawSocketAsexorClient):    
+    
+    @asyncio.coroutine
+    def execute(self, user, role, remote_name, *args, **kwargs):
+        if not self.active:
+            raise RuntimeError('WebSocket is closed')
+        call_id = self._next_call_id
+        msg = DelegatedCallMessage(call_id, remote_name, args, kwargs,user,role)
+        logger.debug('Message send: %s', msg)
+        self.send_msg(msg)
+        
+        fut = self.loop.create_future()
+        self._pending_calls[call_id]=fut
+        return fut
             

@@ -56,6 +56,8 @@ if __name__ == '__main__':
         '-d', '--debug', action='store_true', help='enable debug',)
     parser.add_argument('--use-wamp', action='store_true', help='Use WAMP protocol - requires WAMP router(crossbar.io) to be running')
     parser.add_argument('--use-raw', action='store_true', help="Use raw socket protocol")
+    parser.add_argument('--raw-is-delegated', action='store_true', help="Raw protocol expects delegated messages")
+    parser.add_argument('--raw-is-no-update', action='store_true', help="Raw protocol does not return update messages")
     opts = parser.parse_args()
     loop = asyncio.get_event_loop()
     if opts.debug:
@@ -96,7 +98,8 @@ if __name__ == '__main__':
         url = 'tcp://0.0.0.0:8485'
         from asexor.raw_backend import RawSocketAsexorBackend
         Config.RAW.AUTHENTICATION_PROCEDURE = dummy_authenticate_simple
-        protocols.append((RawSocketAsexorBackend, {'url': url}))
+        protocols.append((RawSocketAsexorBackend, {'url': url, 'delegated': opts.raw_is_delegated,
+                                                   'no_update': opts.raw_is_no_update}))
 
         
     runner = Runner(protocols)

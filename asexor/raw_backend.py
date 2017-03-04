@@ -1,6 +1,6 @@
 import asyncio
 from asexor.raw_socket import PrefixProtocol
-from asexor.message import CallMessage, ErrorMessage, ReplyMessage, UpdateMessage
+from asexor.message import DelegatedCallMessage, CallMessage, ErrorMessage, ReplyMessage, UpdateMessage
 from asexor.utils import asure_coro_fn
 from asexor.config import Config, ConfigError
 from asexor.tqueue import TaskSchedulerMixin
@@ -14,6 +14,10 @@ logger = logging.getLogger('raw_backend')
 HS_CODE_OK = b'\x00' 
 HS_CODE_AUTH_ERROR = b'\x01' 
 HS_CODE_OTHER_ERROR = b'\x02'    
+
+class NoUpdateCallContext(AbstractTaskContext):
+    def send(self, task_id, **kwargs):
+        pass
 
 class CallContext(AbstractTaskContext):  
     def __init__(self, call_id, session):
@@ -31,10 +35,15 @@ class CallContext(AbstractTaskContext):
 
 class AsexorBackendSession(PrefixProtocol, TaskSchedulerMixin):
     
-    def __init__(self, tasks_queue, loop=None):
+    def __init__(self, tasks_queue, delegated=False, no_update=False, loop=None):
         PrefixProtocol.__init__(self, loop=loop)
         self._handshake = self.HS_NONE
         self.tasks = tasks_queue
+        self.delegated = delegated
+        if no_update:
+            self.no_update = NoUpdateCallContext()
+        else:
+            self.no_update = None
     
     HS_NONE = 0
     HS_IN_PROGRESS = 1
@@ -43,7 +52,10 @@ class AsexorBackendSession(PrefixProtocol, TaskSchedulerMixin):
     def frame_received(self, data):
         if self._handshake == self.HS_DONE:
             try:
-                msg = CallMessage.from_binary(data)
+                if self.delegated:
+                    msg = DelegatedCallMessage.from_binary(data)
+                else:
+                    msg = CallMessage.from_binary(data)
             except:
                 logger.debug('Invalid message: %s', data)
                 self.protocol_error('Invalid call message')
@@ -53,9 +65,6 @@ class AsexorBackendSession(PrefixProtocol, TaskSchedulerMixin):
             self.loop.create_task(self.authenticate(data))
         else:
             self.protocol_error('No data should come until handshake is complete')
-            
-    
-            
             
     async def authenticate(self, token):
         try:
@@ -83,10 +92,21 @@ class AsexorBackendSession(PrefixProtocol, TaskSchedulerMixin):
             self._handshake = self.HS_DONE
             
     async def process_message(self, call): 
-        ctx = CallContext(call.call_id, self)
+        if self.no_update:
+            ctx = self.no_update
+        else:
+            ctx = CallContext(call.call_id, self)
         try:
+            if self.delegated:
+                user = call.user
+                role = call.user
+            else:
+                user = self.user
+                role = self.role
+            if not user:
+                raise Exception('User identification is missing')    
             task_id = self.schedule_task(
-                ctx, self.user, self.role, call.task_name, *call.args, **call.kwargs)
+                ctx, user, role, call.task_name, *call.args, **call.kwargs)
             res = ReplyMessage(call.call_id, task_id)
             logger.debug('Sending respose: %s', res)
             self.send(res.as_binary())
@@ -95,17 +115,18 @@ class AsexorBackendSession(PrefixProtocol, TaskSchedulerMixin):
             tb = traceback.format_exc()
             logger.exception('Task scheduling error')
             self.send(ErrorMessage(call.call_id, error, error_stack=tb).as_binary())
-        
-        
+            
 
 class RawSocketAsexorBackend(AbstractBackend):   
-    def __init__(self, loop, url): 
+    def __init__(self, loop, url, delegated=False, no_update=False): 
         super(RawSocketAsexorBackend, self).__init__(loop)   
         self.url = url
+        self.delegated = delegated
+        self.no_update = no_update
         
     async def start(self, tasks_queue):
         parsed_url = urlparse(self.url)
-        fact = lambda: AsexorBackendSession(tasks_queue, self.loop)
+        fact = lambda: AsexorBackendSession(tasks_queue, self.loop, delegated=self.delegated, no_update=self.no_update)
         
         if parsed_url.scheme =='tcp':
             coro=self.loop.create_server(fact,

@@ -1,20 +1,12 @@
-import aiohttp
 import asyncio
 import logging
 import argparse
 import sys
 from collections import defaultdict, deque
-import random
-from asexor.ws_client import AsexorClient
-from asexor.wamp_client import WampAsexorClient
 from asexor.raw_client import RawSocketAsexorClient
 
 logger = logging.getLogger('dummy_client')
 
-                
-TASKS = [('date', ('%d-%m-%Y %H:%M %Z',), {'utc': True}),
-         ('sleep', (0.1,), {})
-         ]
                 
 class MyClient():
     def __init__(self, count, time, session, loop=None):
@@ -113,7 +105,7 @@ if __name__ == '__main__':
     
     path = '/tmp/asexor-test.socket'
     url = 'tcp://localhost:8485'
-    session = RawSocketAsexorClient(url, 'ivan', loop)
+    session = RawSocketAsexorClient(url, opts.user, loop)
     
     try:
         loop.run_until_complete(session.start())
