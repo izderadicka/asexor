@@ -108,7 +108,7 @@ class DelegatedCallMessage(CallMessage):
             kwargs = payload.get('kwargs') or {}
             user = payload.get('user')
             role = payload.get('role')
-            return CallMessage(call_id, task_name, args, kwargs, user, role)
+            return DelegatedCallMessage(call_id, task_name, args, kwargs, user, role)
         except Exception as e:
             try:
                 call_id = data[0]

@@ -57,8 +57,9 @@ class AsexorBackendSession(PrefixProtocol, TaskSchedulerMixin):
                 else:
                     msg = CallMessage.from_binary(data)
             except:
-                logger.debug('Invalid message: %s', data)
+                logger.exception('Invalid message: %s', data)
                 self.protocol_error('Invalid call message')
+                return
             self.loop.create_task(self.process_message(msg))
         elif self._handshake == self.HS_NONE:
             #authenticate -  data are token
@@ -126,7 +127,7 @@ class RawSocketAsexorBackend(AbstractBackend):
         
     async def start(self, tasks_queue):
         parsed_url = urlparse(self.url)
-        fact = lambda: AsexorBackendSession(tasks_queue, self.loop, delegated=self.delegated, no_update=self.no_update)
+        fact = lambda: AsexorBackendSession(tasks_queue, loop=self.loop, delegated=self.delegated, no_update=self.no_update)
         
         if parsed_url.scheme =='tcp':
             coro=self.loop.create_server(fact,
