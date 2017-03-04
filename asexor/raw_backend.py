@@ -100,12 +100,13 @@ class AsexorBackendSession(PrefixProtocol, TaskSchedulerMixin):
         try:
             if self.delegated:
                 user = call.user
-                role = call.user
+                role = call.role
+                logger.debug('Task %s is delegated for user %s with role %s', call.task_name, user, role)
             else:
                 user = self.user
                 role = self.role
             if not user:
-                raise Exception('User identification is missing')    
+                raise Exception('User identification is missing, %s', str(call))    
             task_id = self.schedule_task(
                 ctx, user, role, call.task_name, *call.args, **call.kwargs)
             res = ReplyMessage(call.call_id, task_id)

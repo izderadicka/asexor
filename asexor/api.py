@@ -193,7 +193,7 @@ class AbstractClientWithCallMatch(AbstractClient):
         elif isinstance(response, ErrorMessage):
             fut = get_call_future(response)
             if fut:
-                fut.set_exception(RemoteError(response.error, response.error_stack_trace))
+                fut.set_exception(RemoteError(response.error, response.error_stack))
                 
         elif isinstance(response,UpdateMessage):
             res = response.data

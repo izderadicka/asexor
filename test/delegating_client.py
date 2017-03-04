@@ -5,7 +5,7 @@ import argparse
 import sys
 from collections import defaultdict, deque
 import random
-from asexor.raw_client import RawSocketAsexorClient
+from asexor.raw_client import DelegatedRawSocketAsexorClient
 
 logger = logging.getLogger('dummy_client')
 
@@ -17,7 +17,7 @@ TASKS = [('date', ('%d-%m-%Y %H:%M %Z',), {'utc': True}),
 USERS = [('pepa', 'user'), ('franta', 'user'), ('venda', 'superuser'), ('kaja', 'admin')]
                 
 class MyClient():
-    def __init__(self, count, time, session, loop=None):
+    def __init__(self, count,  session, loop=None):
         self.loop = loop or asyncio.get_event_loop()
         self._tasks_table = defaultdict(dict)
         self._pending_updates = deque()
@@ -25,7 +25,6 @@ class MyClient():
         self._all_done.add_done_callback(self._on_done)
         self.session = session
         self.count = count
-        self.time = time
 
     
 
@@ -81,8 +80,8 @@ class MyClient():
 
         for i in range(self.count):
             task_name, args, kwargs = random.choice(TASKS)
-            user, role = ranndom.choice(USERS)
-            task_id = await self.session.execute(task_name, *args, **kwargs)
+            user, role = random.choice(USERS)
+            task_id = await self.session.execute(user, role, task_name, *args, **kwargs)
             logger.debug('Task submitted with id=%s', task_id)
             self._tasks_table[task_id]['status'] = 'sent'
 
@@ -114,7 +113,7 @@ if __name__ == '__main__':
     
     path = '/tmp/asexor-test.socket'
     url = 'tcp://localhost:8485'
-    session = RawSocketAsexorClient(url, 'ivan', loop)
+    session = DelegatedRawSocketAsexorClient(url, 'ivan', loop)
     
     try:
         loop.run_until_complete(session.start())
@@ -122,7 +121,7 @@ if __name__ == '__main__':
         logger.error('Preliminary exited')
         loop.run_until_complete(session.stop())
         sys.exit(1)
-    client =  MyClient(opts.number, opts.time, session, loop)
+    client =  MyClient(opts.number, session, loop=loop)
     loop.run_until_complete(client.run())
     loop.run_until_complete(session.stop())
     
