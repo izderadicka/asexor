@@ -83,14 +83,5 @@ class DelegatedRawSocketAsexorClient(RawSocketAsexorClient):
     
     @asyncio.coroutine
     def execute(self, user, role, remote_name, *args, **kwargs):
-        if not self.active:
-            raise RuntimeError('WebSocket is closed')
-        call_id = self._next_call_id
-        msg = DelegatedCallMessage(call_id, remote_name, args, kwargs,user,role)
-        logger.debug('Message send: %s', msg)
-        self.send_msg(msg)
-        
-        fut = self.loop.create_future()
-        self._pending_calls[call_id]=fut
-        return fut
-            
+        return self.execute_msg(DelegatedCallMessage, remote_name, args, kwargs,user,role)
+    

@@ -182,10 +182,14 @@ class AbstractClientWithCallMatch(AbstractClient):
     
     @asyncio.coroutine  # It is coroutine - returns future       
     def execute(self, remote_name, *args, **kwargs):
+        return self.execute_msg(CallMessage, remote_name, args, kwargs)
+    
+    @asyncio.coroutine
+    def execute_msg(self, msg_cls, *args, **kwargs):
         if not self.active:
             raise RuntimeError('WebSocket is closed')
         call_id = self._next_call_id
-        msg = CallMessage(call_id, remote_name, args, kwargs)
+        msg = msg_cls(call_id, *args, **kwargs)
         logger.debug('Message send: %s', msg)
         self.send_msg(msg)
         
