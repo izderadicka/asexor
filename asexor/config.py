@@ -14,6 +14,7 @@ class Config():
     # number of tasks that can run in parallel, None means number of cores
     CONCURRENT_TASKS = None
     TASKS_QUEUE_MAX_SIZE = 0  # 0 means not limited
+    CLIENT_CALL_TIMEOUT = 5 # max. waiting time  on client side to get task_id, when exceeded TimeoutError is thrown
     ######################
     # WAMP related configuration
     class WAMP:

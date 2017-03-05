@@ -81,7 +81,8 @@ class MyClient():
         # sheduling
         # self._process_pending()
         self._check_done()
-        await self._all_done
+        await  asyncio.wait([self._all_done, self.session.wait_closed()], return_when=asyncio.FIRST_COMPLETED)
+        logger.info('Client is done')
                 
                 
 if __name__ == '__main__':

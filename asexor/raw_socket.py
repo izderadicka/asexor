@@ -21,6 +21,7 @@ class PrefixProtocol(asyncio.Protocol):
     def __init__(self, loop=None):
         self.loop = loop or asyncio.get_event_loop()
         self._wait_closed = self.loop.create_future()
+        self.transport = None
    
     def connection_made(self, transport):
         self.transport = transport
@@ -37,7 +38,10 @@ class PrefixProtocol(asyncio.Protocol):
         await self._wait_closed
 
     def connection_lost(self, exc):
-        logger.debug('Connection lost: %s', exc)
+        if exc:
+            logger.warn('Connection lost: %s', exc)
+        else:
+            logger.debug('Connection closed')
         self.transport = None
         self._wait_closed.set_result(True)
         self.on_disconnected(was_error=bool(exc))
@@ -112,3 +116,7 @@ class PrefixProtocol(asyncio.Protocol):
 
     def frame_received(self, data):
         raise NotImplementedError()
+    
+    def close(self):
+        if self.transport:
+            self.transport.close()

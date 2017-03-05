@@ -2,6 +2,7 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod, abstractproperty
 from asexor.message import CallMessage, ErrorMessage, ReplyMessage, UpdateMessage
+from asexor.config import Config
 
 logger = logging.getLogger('api')
 
@@ -48,7 +49,7 @@ class AbstractBackend(ABC):
         """
         pass
     
-
+    
 class AbstractClient(ABC):
     """
     Base class for ASEXOR Client Session
@@ -62,9 +63,30 @@ class AbstractClient(ABC):
         self._task = None
         self.loop = loop or asyncio.get_event_loop()
         self._ready = self.loop.create_future()
+        self._closed = self.loop.create_future()
+        self._started = False
         
-    def set_ready(self):
-        self._ready.set_result(True)
+        
+    def set_ready(self, exc=None):
+        try:
+            if exc:
+                self._ready.set_exception(exc)
+            else:
+                self._ready.set_result(True)
+        except asyncio.InvalidStateError:
+                logger.warn('ready future already resolved')
+        
+    def set_closed(self):
+        self._closed.set_result(True)
+    
+    @abstractmethod    
+    def close(self):
+        pass
+        
+    async def wait_closed(self):
+        if not self._started:
+            return
+        await self._closed
         
     async def update_listeners(self, **data):
         for fn in self._listeners:
@@ -77,18 +99,23 @@ class AbstractClient(ABC):
         async def safe_run():
             try:
                 await self.run()
-            except GeneratorExit:
-                pass
-            except (asyncio.CancelledError, KeyboardInterrupt):
-                raise
-            except:
-                logger.exception('Client session error')
-                self.loop.stop()
+            except Exception as e:
+                self.set_ready(e)
                 
         self._task = self.loop.create_task(safe_run())
         await self._ready
+        self._started = True
         
     async def stop(self):
+        try:
+            self.close()
+        except Exception as e:
+            logger.error('Session close error: %s', e)
+        else:
+            try:
+                await self.wait_closed()
+            except:
+                logger.exception('Client stop error')
         if not self._task:
             return
         self._task.cancel()
@@ -98,6 +125,7 @@ class AbstractClient(ABC):
             pass
         except asyncio.TimeoutError:
             logger.warn('Session stop timeout')
+        
         
     def subscribe(self, handler):
         if not asyncio.iscoroutinefunction(handler):
@@ -161,20 +189,33 @@ class AbstractClientWithCallMatch(AbstractClient):
         logger.debug('Message send: %s', msg)
         self.send_msg(msg)
         
+        
         fut = self.loop.create_future()
-        self._pending_calls[call_id]=fut
+        def timeout_future(call_id):
+            if call_id in self._pending_calls:
+                fut, _to = self._pending_calls.pop(call_id)
+                fut.set_exception(TimeoutError('No response received'))
+                
+        to = self.loop.call_later(Config.CLIENT_CALL_TIMEOUT, timeout_future, call_id)
+        self._pending_calls[call_id]=(fut, to)
         return fut
     
     @abstractmethod
     def send_msg(self, msg):
         pass
+    
+    def set_closed(self):
+        AbstractClient.set_closed(self)
+        for f,_t in self._pending_calls.values():
+            f.cancel()
         
     
     # should be used n run method                
     async def process_msg(self, msg_data, deserializer):
         def get_call_future(resp): 
             try:
-                fut = self._pending_calls.pop(resp.call_id)
+                fut,to = self._pending_calls.pop(resp.call_id)
+                to.cancel()
                 return fut
             except KeyError:
                 logger.error('Unmached response %s', resp)

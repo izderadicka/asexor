@@ -13,16 +13,21 @@ class RawSocketAsexorClient(AbstractClientWithCallMatch):
     
     class ClientSession(PrefixProtocol):
         
-        def __init__(self, token, msg_handler, on_ready, loop=None):
+        def __init__(self, token, msg_handler, on_ready, on_closed=None, loop=None):
             PrefixProtocol.__init__(self, loop=loop)
             self.token = token if isinstance(token, bytes) else token.encode('utf-8')
             self._msg_handler = msg_handler
             self._hs_done = False
             self._on_ready = on_ready
+            self._on_closed = on_closed
             
         def on_connected(self):
             logger.debug('Transport buffer: %s', self.transport.get_write_buffer_limits())
             self.send(self.token)
+            
+        def on_disconnected(self, was_error):
+            if self._on_closed:
+                self._on_closed()
             
         def frame_received(self, data):
             if self._hs_done:
@@ -49,13 +54,18 @@ class RawSocketAsexorClient(AbstractClientWithCallMatch):
     def active(self):
         return bool(self._session and self._session.transport)
     
+    def close(self):
+        self._session.close()
+    
     
     def send_msg(self, msg):
         self._session.send(msg.as_binary())
         
     async def run(self):
         self._session = RawSocketAsexorClient.ClientSession(self.token, self.process_msg, 
-                                                            self.set_ready, self.loop)
+                                                            on_ready=self.set_ready, 
+                                                            on_closed=self.set_closed,
+                                                            loop=self.loop)
         parsed_url = urlparse(self.url)
         fact = lambda: self._session
         if parsed_url.scheme =='tcp':

@@ -8,6 +8,7 @@ import random
 from asexor.ws_client import AsexorClient
 from asexor.wamp_client import WampAsexorClient
 from asexor.raw_client import RawSocketAsexorClient
+from asyncio.tasks import FIRST_COMPLETED
 
 logger = logging.getLogger('dummy_client')
 
@@ -88,7 +89,9 @@ class MyClient():
         # sheduling
         # self._process_pending()
         self._check_done()
-        await self._all_done
+        
+        await  asyncio.wait([self._all_done, self.session.wait_closed()], return_when=FIRST_COMPLETED)
+        logger.info('Client is done')
                 
                 
 if __name__ == '__main__':
@@ -119,12 +122,15 @@ if __name__ == '__main__':
     try:
         loop.run_until_complete(session.start())
     except:
-        logger.error('Preliminary exited')
+        logger.exception('Preliminary exited')
         loop.run_until_complete(session.stop())
         sys.exit(1)
     client =  MyClient(opts.number or 10, session, loop)
-    loop.run_until_complete(client.run())
-    loop.run_until_complete(session.stop())
+    try:
+        loop.run_until_complete(client.run())
+        loop.run_until_complete(session.stop())
+    except KeyboardInterrupt:
+        logger.info('Program interrupted by keyboard interrupt (SIGINT)')
     
     
     
