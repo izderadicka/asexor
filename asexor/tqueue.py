@@ -3,7 +3,7 @@ import uuid
 from collections import namedtuple
 from asexor.task import get_task, BaseMultiTask, BaseSimpleTask
 from multiprocessing import cpu_count
-from asexor.config import NORMAL_PRIORITY, Config
+from asexor.config import NORMAL_PRIORITY, Config, ConfigError
 import logging
 import time
 
@@ -17,14 +17,25 @@ class TaskSchedulerMixin:
     To be used within classes that have self.tasks as instance of TasksQueue
     """
     
-    def schedule_task(self, ctx, user, role, task_name, *args, **kwargs):
+    async def schedule_task(self, ctx, user, role, task_name, *args, **kwargs):
         logger.debug(
             'Request for run task %s %s %s', task_name, args, kwargs)
 
         task_priority = Config.DEFAULT_PRIORITY
         if role:
-            task_priority = Config.PRIORITY_MAP.get(
-                role, Config.DEFAULT_PRIORITY)
+            priority_map = Config.PRIORITY_MAP
+            if asyncio.iscoroutinefunction(priority_map):
+                task_priority = (await priority_map(role)) or Config.DEFAULT_PRIORITY
+            elif isinstance(priority_map, dict):
+                task_priority = Config.PRIORITY_MAP.get(
+                    role, Config.DEFAULT_PRIORITY)
+        
+        auth_fn = Config.AUTHORIZATION_PROCEDURE        
+        if  auth_fn and asyncio.iscoroutinefunction(auth_fn):
+            if not (await auth_fn(task_name, role)):
+                raise Exception("Not authorised to run %s" % task_name)
+                
+            
         task_id = self.tasks.add_task(
             task_name, args, kwargs, task_priority, authenticated_user=user,
             task_context=ctx)
@@ -45,14 +56,15 @@ class TasksQueue():
         task = get_task(task_name)(user=authenticated_user)
         task_id = uuid.uuid4().hex
         loop = asyncio.get_event_loop()
-        async def _add():
+        #async def _add():
             # we need to assure that task_id from run_task is sent before first update
             # this is a hack - need to find a better way 
-            await asyncio.sleep(0.1)
+            # await asyncio.sleep(0.1)
             # for security reason consider sync version of put and throw error when q is full
-            await self._q.put((task_priority, time.time(), TaskInfo(task_id, task, task_args, task_kwargs, task_context, 
+#             await self._q.put((task_priority, time.time(), TaskInfo(task_id, task, task_args, task_kwargs, task_context, 
+#                                                        None, None, None)))
+        self._q.put_nowait((task_priority, time.time(), TaskInfo(task_id, task, task_args, task_kwargs, task_context, 
                                                        None, None, None)))
-        loop.create_task(_add())
         return task_id
     
     async def add_subtask(self, multitask, task_no, total_tasks, task_name, task_args=(), task_kwargs={}, 

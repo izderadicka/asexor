@@ -1,5 +1,5 @@
 import os.path
-from asexor.config import Config
+from asexor.config import Config, NORMAL_PRIORITY
 from asexor.task import load_tasks_from
 from asexor.backend_runner import Runner
 from asexor.ws_backend import WsAsexorBackend
@@ -11,18 +11,19 @@ from aiohttp import web
 log = logging.getLogger('ws_server')
 
 # dummy authentication -  token is basically username
-def dummy_authenticate_simple(token):
+ROLES = ['anonymous', 'user', 'superuser', 'admin']
+async def dummy_authenticate_simple(token):
     log.debug('Authenticating user with token %s', token)
     user = token if isinstance(token, str) else token.decode('utf-8')
-    return token, 'user'
+    return user, user if user in ROLES else 'user'
 
 # WAMP requires different  authentication function and authorize function
-def dummy_authenticate(realm, user_id, details):
+async def dummy_authenticate(realm, user_id, details):
     log.debug('Authenticating user %s details %s', user_id, details)
     return {'role': 'user', 'extra': {'ts': time.time()}}
 
 
-def dummy_authorize(session, uri, action):
+async def dummy_authorize(session, uri, action):
     log.debug("Authorizing uri {} for  {}, session={})".format(
         uri, action, session))
 
@@ -31,6 +32,11 @@ def dummy_authorize(session, uri, action):
         return {"allow": True, "disclose": True, "cache": True}
 
     return False
+
+async def authorization_not_anonymous(task_name, role):
+    if role == 'anonymous':
+        return False
+    return True
 
 
 def serve_dir(path, port, loop=None):
@@ -69,6 +75,12 @@ if __name__ == '__main__':
     logging.basicConfig(level=level)
     curr_dir = os.path.dirname(__file__)
     client_dir = os.path.join(curr_dir, 'dummy_client')
+    
+    # Common ASEXOR configs
+    Config.PRIORITY_MAP= {r: NORMAL_PRIORITY +1 - i for i,r in enumerate(ROLES) }
+    Config.AUTHORIZATION_PROCEDURE = authorization_not_anonymous
+    # to test behaviour with limited queue
+    Config.TASKS_QUEUE_MAX_SIZE = 10000
     
     # basic code to start aiohttp WS ASEXOR backend
     Config.WS.AUTHENTICATION_PROCEDURE = dummy_authenticate_simple

@@ -10,11 +10,18 @@ class ConfigError(Exception):
 class Config():
     # GENERAL Configuration
     DEFAULT_PRIORITY = NORMAL_PRIORITY
-    PRIORITY_MAP = {}  # role to priority
+    # role to priority, can be also coroutine function 
+    PRIORITY_MAP = {}  
     # number of tasks that can run in parallel, None means number of cores
     CONCURRENT_TASKS = None
-    TASKS_QUEUE_MAX_SIZE = 0  # 0 means not limited
-    CLIENT_CALL_TIMEOUT = 5 # max. waiting time  on client side to get task_id, when exceeded TimeoutError is thrown
+    # 0 means not limited
+    TASKS_QUEUE_MAX_SIZE = 0  
+    # max. waiting time  on client side to get task_id, when exceeded TimeoutError is thrown
+    CLIENT_CALL_TIMEOUT = 5 
+    # coroutine function , takes task_name and role, return boolean , None means no special authorization
+    AUTHORIZATION_PROCEDURE = None
+    # Send stack for errors caused by task scheduling -  should not be used in production
+    SEND_REMOTE_ERROR_STACK =  True
     ######################
     # WAMP related configuration
     class WAMP:

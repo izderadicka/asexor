@@ -6,7 +6,7 @@ import 'font-awesome';
 
 let startApp = function() {
 	  console.log('All loaded');
-	  const USER='ivan';
+	  const USER='admin';
 	  let count=0,
 	      tasksList= new Array(),
 	      tasksStatus= new Map(),
@@ -14,7 +14,7 @@ let startApp = function() {
 
 		if (/use-wamp/.test(window.location.search)) {
 
-			client = new WampAsexorClient('ws://127.0.0.1:8880/ws', 'realm1', 'ivan', 'ivan');
+			client = new WampAsexorClient('ws://127.0.0.1:8880/ws', 'realm1', USER, USER);
 
 		} else {
 

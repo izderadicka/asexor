@@ -36,8 +36,13 @@ class MyClient():
         if has_error:
             logger.error('Some tasks have error')
         
-
+    transitions = {'sent': ('started', ),
+                   'started': ('success', 'error')}
     def _update_task(self, task_id, status, kwargs):
+        next_states = self.transitions[self._tasks_table[task_id]['status']]
+        if not status in next_states:
+            logger.error('Invalid transition in task %s - from %s to %s ', task_id, 
+                         self._tasks_table[task_id]['status'], status) 
         self._tasks_table[task_id]['status'] = status
         if 'result' in kwargs:
             self._tasks_table[task_id]['result'] = kwargs['result']
@@ -81,6 +86,13 @@ class MyClient():
 
         for i in range(self.count):
             task_name, args, kwargs = random.choice(TASKS)
+            if task_name == 'sleep':
+                mean=args[0]
+                stddev = mean / 50
+                rand_time = random.gauss(mean, stddev)
+                if rand_time < 0:
+                    rand_time = 0
+                args=(rand_time,)
             task_id = await self.session.execute(task_name, *args, **kwargs)
             logger.debug('Task submitted with id=%s', task_id)
             self._tasks_table[task_id]['status'] = 'sent'
@@ -92,6 +104,17 @@ class MyClient():
         
         await  asyncio.wait([self._all_done, self.session.wait_closed()], return_when=FIRST_COMPLETED)
         logger.info('Client is done')
+                
+    def print_unfinished_tasks(self):
+        unfinished = []
+        for task_id in self._tasks_table:
+            task = self._tasks_table[task_id]
+            if task['status'] not in ('success', 'error'):
+                unfinished.append((task_id, task)) 
+        if unfinished:
+            print("UNFINISHED TASKS:\n")
+            for task_id, task in unfinished:
+                print('%s: %s'%(task_id, task))
                 
                 
 if __name__ == '__main__':
@@ -131,6 +154,10 @@ if __name__ == '__main__':
         loop.run_until_complete(session.stop())
     except KeyboardInterrupt:
         logger.info('Program interrupted by keyboard interrupt (SIGINT)')
+        client.print_unfinished_tasks()
+    except:
+        logger.exception('Program error')
+        sys.exit(2)
     
     
     

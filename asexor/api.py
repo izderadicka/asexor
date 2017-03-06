@@ -3,6 +3,7 @@ import logging
 from abc import ABC, abstractmethod, abstractproperty
 from asexor.message import CallMessage, ErrorMessage, ReplyMessage, UpdateMessage
 from asexor.config import Config
+from functools import partial
 
 logger = logging.getLogger('api')
 
@@ -88,12 +89,15 @@ class AbstractClient(ABC):
             return
         await self._closed
         
-    async def update_listeners(self, **data):
-        for fn in self._listeners:
-            try:
-                await fn(**data)
-            except Exception as e:
-                logger.exception('Error when processing task update notification')
+    def update_listeners(self, **data):
+        async def update_listeners(**data):
+            for fn in self._listeners:
+                try:
+                    await fn(**data)
+                except Exception as e:
+                    logger.exception('Error when processing task update notification')
+        # Add as new Task,  so executed later when execute method returns task_id 
+        self.loop.create_task(update_listeners(**data))
         
     async def start(self):
         async def safe_run():
@@ -160,7 +164,7 @@ class RemoteError(Exception):
         self.remote_stack_trace = remote_stack_trace
         
     def __str__(self):
-        return self.message +'\n' + self.remote_stack_trace    
+        return self.message +('\n' + self.remote_stack_trace  if self.remote_stack_trace else '')
 
 class AbstractClientWithCallMatch(AbstractClient):
     """Client bases class that matches calls with responses"""
@@ -180,12 +184,12 @@ class AbstractClientWithCallMatch(AbstractClient):
     def active(self):
         return bool(self._ws and not self._ws.closed)
     
-    @asyncio.coroutine  # It is coroutine - returns future       
-    def execute(self, remote_name, *args, **kwargs):
-        return self.execute_msg(CallMessage, remote_name, args, kwargs)
     
-    @asyncio.coroutine
-    def execute_msg(self, msg_cls, *args, **kwargs):
+    async def execute(self, remote_name, *args, **kwargs):
+        return await self.execute_msg(CallMessage, remote_name, args, kwargs)
+    
+    
+    async def execute_msg(self, msg_cls, *args, **kwargs):
         if not self.active:
             raise RuntimeError('WebSocket is closed')
         call_id = self._next_call_id
@@ -197,12 +201,17 @@ class AbstractClientWithCallMatch(AbstractClient):
         fut = self.loop.create_future()
         def timeout_future(call_id):
             if call_id in self._pending_calls:
-                fut, _to = self._pending_calls.pop(call_id)
-                fut.set_exception(TimeoutError('No response received'))
-                
+                fut, _to = self._pending_calls[call_id]
+                if not fut.done():
+                    fut.set_exception(TimeoutError('No response received'))
+        def remove_future(f):
+            del self._pending_calls[call_id]
+            to.cancel()
+            
+        fut.add_done_callback(remove_future)        
         to = self.loop.call_later(Config.CLIENT_CALL_TIMEOUT, timeout_future, call_id)
         self._pending_calls[call_id]=(fut, to)
-        return fut
+        return await fut
     
     @abstractmethod
     def send_msg(self, msg):
@@ -210,16 +219,17 @@ class AbstractClientWithCallMatch(AbstractClient):
     
     def set_closed(self):
         AbstractClient.set_closed(self)
-        for f,_t in self._pending_calls.values():
+        for f,t in self._pending_calls.values():
             f.cancel()
+            t.cancel()
+        self._pending_calls.clear()
         
     
     # should be used n run method                
     async def process_msg(self, msg_data, deserializer):
         def get_call_future(resp): 
             try:
-                fut,to = self._pending_calls.pop(resp.call_id)
-                to.cancel()
+                fut,_to = self._pending_calls[resp.call_id]
                 return fut
             except KeyError:
                 logger.error('Unmached response %s', resp)
@@ -243,6 +253,15 @@ class AbstractClientWithCallMatch(AbstractClient):
         elif isinstance(response,UpdateMessage):
             res = response.data
             assert('status' in res and 'task_id' in res)
-            await self.update_listeners(**res)
+            pending = self._pending_calls.get(response.call_id)
+            if pending:
+                logger.debug('Pending update, execute future not done')
+                try:
+                    await pending[0]
+                except Exception as e:
+                    logger.error('Cannot update, because call future has error: %s', e)
+                    return
+            
+            self.update_listeners(**res)
         else:
             logger.error("Invalid message type")

@@ -48,7 +48,7 @@ class AsexorBackendSession(ApplicationSession, TaskSchedulerMixin):
             self.register(Config.WAMP.AUTHORIZATION_PROCEDURE, Config.WAMP.AUTHORIZATION_PROCEDURE_NAME)
             
 
-        def run_task(task_name, *args, **kwargs):
+        async def run_task(task_name, *args, **kwargs):
             logger.debug(
                 'Request for run task %s %s %s', task_name, args, kwargs)
             details = kwargs.pop('__call_details__', None)
@@ -57,7 +57,7 @@ class AsexorBackendSession(ApplicationSession, TaskSchedulerMixin):
             role = details.caller_authrole
             user = details.caller_authid
             ctx = CallContext(self, details.caller)
-            task_id = self.schedule_task(ctx, user, role, task_name, *args, **kwargs)
+            task_id = await self.schedule_task(ctx, user, role, task_name, *args, **kwargs)
             return task_id
         self.register(run_task, Config.WAMP.RUN_TASK_PROC, RegisterOptions(
             details_arg='__call_details__'))

@@ -107,14 +107,14 @@ class AsexorBackendSession(PrefixProtocol, TaskSchedulerMixin):
                 role = self.role
             if not user:
                 raise Exception('User identification is missing, %s', str(call))    
-            task_id = self.schedule_task(
+            task_id = await self.schedule_task(
                 ctx, user, role, call.task_name, *call.args, **call.kwargs)
             res = ReplyMessage(call.call_id, task_id)
             logger.debug('Sending respose: %s', res)
             self.send(res.as_binary())
         except Exception as e:
             error = str(e) or repr(e)
-            tb = traceback.format_exc()
+            tb = traceback.format_exc() if Config.SEND_REMOTE_ERROR_STACK else None
             logger.exception('Task scheduling error')
             self.send(ErrorMessage(call.call_id, error, error_stack=tb).as_binary())
             

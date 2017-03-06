@@ -1,7 +1,7 @@
 from autobahn.asyncio.wamp import ApplicationSession
 from autobahn.wamp.types import ComponentConfig
 import asyncio
-import functools
+from functools import partial
 from asexor.wamp_backend import start_wamp_session
 from asexor.config import Config
 from asexor.api import AbstractClient
@@ -45,7 +45,10 @@ class WampAsexorClient(AbstractClient):
     
         async def on_task_update(self, task_id, status=None, **kwargs):
             if self._on_update:
-                await self._on_update(task_id=task_id, status=status, **kwargs)
+                # TODO - this is ugly hack -as I do not know how to easily assure that update is called,
+                #  after execute returns
+                self.loop.call_later(0.1,
+                    partial(self._on_update, task_id=task_id, status=status, **kwargs))
     
         def onLeave(self, details):
             logger.debug("Leaving session %s", details)
