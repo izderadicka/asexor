@@ -1,15 +1,16 @@
 import asyncio
 import logging
-from asexor.api import AbstractTaskContext, AbstractBackend
-from asexor.config import Config, ConfigError
-from asexor.message import CallMessage, ErrorMessage, ReplyMessage, UpdateMessage
-from asexor.utils import asure_coro_fn
-from asexor.tqueue import TaskSchedulerMixin
 from collections import defaultdict
 from aiohttp import web
 import aiohttp
 import traceback
 from copy import copy
+
+from asexor.api import AbstractTaskContext, AbstractHttpBackend
+from asexor.config import Config, ConfigError
+from asexor.message import CallMessage, ErrorMessage, ReplyMessage, UpdateMessage
+from asexor.utils import asure_coro_fn
+from asexor.tqueue import TaskSchedulerMixin
 
 logger = logging.getLogger('ws_backend')
 
@@ -108,31 +109,14 @@ class AsexorBackendSession(TaskSchedulerMixin):
                                message=message)
                 
                 
-class WsAsexorBackend(AbstractBackend):
+class WsAsexorBackend(AbstractHttpBackend):
     
-    def __init__(self, loop, host='0.0.0.0', port=8484, static_dir=None, 
-                 ssl_context=None, backlog=128):
-        """ Starts http server on host:post, serving ASEXOR protocol via WebSocketon http://host:port/ws.
-        
-        :param host: - interface to listen on, default is 0.0.0.0 - all available interfaces
-        :param port: TCP post to listen on
-        :param static_dir: - serve also files from this directory - only for test and development !
-        """
-        self.loop=loop
-        self.host = host
-        self.port = port
+    def __init__(self, loop, *, host='0.0.0.0', port=8484, 
+        ssl_context=None, backlog=128, static_dir=None):
+        AbstractHttpBackend.__init__(self, loop, host=host, port=port, ssl_context=ssl_context, backlog=backlog)
         self.static_dir = static_dir
-        self.app = None
-        self.ssl_context = ssl_context
-        self.backlog = backlog
         
-        
-    
-    async def start(self, tasks_queue):
-        """
-        Starts aiohttp server for ASEXOR WebSocket protocol
-        """ 
-        
+    def create_app(self, tasks_queue): 
         self.app = web.Application(loop=self.loop)
         session = AsexorBackendSession(tasks_queue, self.app.loop)
         self.app.on_shutdown.append(session.close_all_websockets)
@@ -141,22 +125,6 @@ class WsAsexorBackend(AbstractBackend):
         if self.static_dir:
             self.app.router.add_static('/', self.static_dir, show_index=True, follow_symlinks=True)
             logger.info('Serving static  files from %s', self.static_dir)
-        
-        
-        self.handler = self.app.make_handler(access_log=aiohttp.log.access_logger)
+           
     
-        await self.app.startup()
-        self.srv = await self.loop.create_server(self.handler, self.host,
-                                                         self.port, ssl=self.ssl_context,
-                                                         backlog=self.backlog)
     
-        logger.info('aiohttp server running on %s port %s', self.host, self.port)
-        
-        
-    async def stop(self):
-        self.srv.close()
-        await self.srv.wait_closed()
-        await self.app.shutdown()
-        await self.handler.shutdown(10.0)
-        await self.app.cleanup()
-

@@ -1,4 +1,5 @@
 import asyncio
+import aiohttp
 import logging
 from abc import ABC, abstractmethod, abstractproperty
 from asexor.message import CallMessage, ErrorMessage, ReplyMessage, UpdateMessage
@@ -49,6 +50,53 @@ class AbstractBackend(ABC):
         Stops backend protocol
         """
         pass
+    
+
+class AbstractHttpBackend(AbstractBackend):
+    
+    def __init__(self, loop, *, host='0.0.0.0', port=8484, 
+                 ssl_context=None, backlog=128):
+        """ Starts http server on host:post, serving ASEXOR protocol via WebSocketon http://host:port/ws.
+        
+        :param host: - interface to listen on, default is 0.0.0.0 - all available interfaces
+        :param port: TCP post to listen on
+        :param ssl_context: - ssl context to use https protocol
+        :param backlog: max number of queued connections before refusing to accept other connection 
+        """
+        self.loop=loop
+        self.host = host
+        self.port = port
+        
+        self.app = None
+        self.ssl_context = ssl_context
+        self.backlog = backlog
+    
+    @abstractmethod    
+    def create_app(self, tasks_queue): 
+        raise NotImplementedError()
+    
+    async def start(self, tasks_queue):
+        """
+        Starts aiohttp server for ASEXOR WebSocket protocol
+        """ 
+        self.create_app(tasks_queue)
+        self.handler = self.app.make_handler(access_log=aiohttp.log.access_logger)
+    
+        await self.app.startup()
+        self.srv = await self.loop.create_server(self.handler, self.host,
+                                                         self.port, ssl=self.ssl_context,
+                                                         backlog=self.backlog)
+    
+        logger.info('aiohttp server running on %s port %s', self.host, self.port)
+        
+        
+    async def stop(self):
+        self.srv.close()
+        await self.srv.wait_closed()
+        await self.app.shutdown()
+        await self.handler.shutdown(10.0)
+        await self.app.cleanup()
+
     
     
 class AbstractClient(ABC):

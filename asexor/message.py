@@ -137,6 +137,7 @@ class ReplyMessage(Message):
     @classmethod
     def from_data(cls, data):
         _type, call_id, task_id = data
+        assert _type == 'r'
         return ReplyMessage(call_id, task_id)
     
 class ErrorMessage(Message):
@@ -153,6 +154,7 @@ class ErrorMessage(Message):
     @classmethod
     def from_data(cls, data):
         _type, call_id, error, error_stack = data
+        assert _type == 'e'
         return ErrorMessage(call_id, error, error_stack)
     
 

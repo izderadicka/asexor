@@ -55,4 +55,16 @@ class Config():
         AUTHENTICATION_PROCEDURE = None
     ####################################   
     
+    ####################################
+    class LP:
+        COOKIE_NAME = 'ASEXOR_LP_SESSION'
+        MAX_SESSION_TIME = 24 * 3600 # maximum total length of session is seconds
+        MAX_SESSION_INACTIVITY = 3600 # maximum inactivity in session before it's recycled
+        LONG_POLL_TIMEOUT = 600 # timeout for long poll waiting 
+        # authentication function - takes one param - token,
+        # return tuple - user_id, user_role
+        AUTHENTICATION_PROCEDURE = None
+        
+        
+    
     

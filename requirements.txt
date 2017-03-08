@@ -8,3 +8,4 @@ crossbar>=0.14.0
 
 #development requirements
 pytest
+pytest-aiohttp>=0.1.3
