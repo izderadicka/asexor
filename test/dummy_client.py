@@ -5,9 +5,6 @@ import argparse
 import sys
 from collections import defaultdict, deque
 import random
-from asexor.ws_client import AsexorClient
-from asexor.wamp_client import WampAsexorClient
-from asexor.raw_client import RawSocketAsexorClient
 from asyncio.tasks import FIRST_COMPLETED
 
 logger = logging.getLogger('dummy_client')
@@ -125,6 +122,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--number', type=int, default=10, help="number of remote calls")
     parser.add_argument('--use-wamp', action='store_true', help='Use WAMP protocol - requires WAMP router(crossbar.io) to be running')
     parser.add_argument('--use-raw', action='store_true', help="Use raw socket protocol")
+    parser.add_argument('--use-long-poll', action='store_true', help="Use long poll http protocol")
     opts = parser.parse_args()
     loop = asyncio.get_event_loop()
     level = logging.INFO
@@ -135,12 +133,19 @@ if __name__ == '__main__':
     
     
     if opts.use_wamp:
+        from asexor.wamp_client import WampAsexorClient
         session = WampAsexorClient("tcp://localhost:9090",  u"realm1", opts.user, opts.user, loop=loop)
     elif opts.use_raw:
+        from asexor.raw_client import RawSocketAsexorClient
         path = '/tmp/asexor-test.socket'
         url = 'tcp://localhost:8485'
         session = RawSocketAsexorClient(url, opts.user, loop)
+    elif opts.use_long_poll:
+        from asexor.lp_client import LpAsexorClient
+        url='http://localhost:8486/'
+        session = LpAsexorClient(url, opts.user, loop=loop)
     else:
+        from asexor.ws_client import AsexorClient
         session = AsexorClient('http://localhost:8484/ws', opts.user, loop)
     try:
         loop.run_until_complete(session.start())

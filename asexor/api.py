@@ -195,7 +195,7 @@ class AbstractClient(ABC):
         
         
     @abstractmethod
-    def execute(self, remote_name, *args, **kwargs):
+    async def execute(self, remote_name, *args, **kwargs):
         pass
     
     @abstractmethod

@@ -85,6 +85,13 @@ class MyAppTestCase(AioHTTPTestCase):
             
         self.assertAlmostEqual(dur, 1, 1,  'Timeout')
         
+    @unittest_run_loop
+    async def test_start_session(self):
+        resp = await self.client.get('/', headers={'Authorization': 'Bearer ivan'})
+        data = await resp.text()
+        self.assertEqual(data, '[]')
+        
+        
         
         
         

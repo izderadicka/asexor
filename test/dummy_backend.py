@@ -62,6 +62,7 @@ if __name__ == '__main__':
         '-d', '--debug', action='store_true', help='enable debug',)
     parser.add_argument('--use-wamp', action='store_true', help='Use WAMP protocol - requires WAMP router(crossbar.io) to be running')
     parser.add_argument('--use-raw', action='store_true', help="Use raw socket protocol")
+    parser.add_argument('--use-long-poll', action='store_true', help="Use long poll http protocol")
     parser.add_argument('--raw-is-delegated', action='store_true', help="Raw protocol expects delegated messages")
     parser.add_argument('--raw-is-no-update', action='store_true', help="Raw protocol does not return update messages")
     opts = parser.parse_args()
@@ -112,6 +113,11 @@ if __name__ == '__main__':
         Config.RAW.AUTHENTICATION_PROCEDURE = dummy_authenticate_simple
         protocols.append((RawSocketAsexorBackend, {'url': url, 'delegated': opts.raw_is_delegated,
                                                    'no_update': opts.raw_is_no_update}))
+        
+    if opts.use_long_poll:
+        from asexor.lp_backend import LpAsexorBackend
+        Config.LP.AUTHENTICATION_PROCEDURE =  dummy_authenticate_simple
+        protocols.append((LpAsexorBackend, {'port': 8486}))
 
         
     runner = Runner(protocols)

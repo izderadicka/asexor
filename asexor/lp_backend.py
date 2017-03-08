@@ -87,8 +87,6 @@ async def middleware(app, handler):
             session = None
             logger.debug('Session %s reached max life time', session_id)
         if not session:
-            if request.method == 'GET': # get  must have existing session
-                raise aiohttp.errors.HttpProcessingError(403, 'Access Denied')
             while True:
                 session_id = base64.b85encode(os.urandom(32)).decode('ascii')
                 if not session_id in sessions:
@@ -100,12 +98,15 @@ async def middleware(app, handler):
                               loop =  app.loop)
             sessions[session_id] = session
             request['new_session'] = True
+            logger.debug('Starting new session %s', session_id)
         else:
             session.retire_task.cancel()
             session.retire_task = app.loop.call_later(Config.LP.MAX_SESSION_INACTIVITY, retire, session_id)
             request['new_session'] = False
+            logger.debug('Using existing session %s', session_id)
             
         request['session'] = session
+            
             
         try:
             response = await handler(request)
@@ -123,8 +124,9 @@ async def middleware(app, handler):
     return middleware_handler
 
 class CallContext(AbstractTaskContext):
-    def __init__(self, session):
+    def __init__(self, call_id, session):
         self._session = session
+        self.call_id = call_id
         
     def send(self, task_id, **kwargs):
         kwargs['task_id']=task_id
@@ -154,7 +156,7 @@ class AsexorBackendSession(TaskSchedulerMixin):
                 else:
                     return ErrorMessage(0, str(e) or 'Invalid message')
                 
-            ctx = CallContext(session)
+            ctx = CallContext(call.call_id, session)
             try:
                 task_id = await self.schedule_task(
                     ctx, session.user, session.role, call.task_name, *call.args, **call.kwargs)
@@ -174,7 +176,8 @@ class AsexorBackendSession(TaskSchedulerMixin):
         session = request['session']
         messages = []
         try:
-            messages = await asyncio.wait_for(session.get_messages(),
+            if not request['new_session']: # for ne session return immediately to provide session_id
+                messages = await asyncio.wait_for(session.get_messages(),
                                               Config.LP.LONG_POLL_TIMEOUT,
                                               loop = request.app.loop)
         except asyncio.TimeoutError:
