@@ -4,17 +4,36 @@ ASEXOR
 ASEXOR = ASynchronous EXecutOR
 
 This module enables to execute defined tasks (processes) on remote machine. So nothing new - but this one 
-is based on two relatively new technologies -  [Python Asyncio](https://docs.python.org/3/library/asyncio.html) and [WAMP](http://wamp-proto.org/). 
+is based on  [Python Asyncio](https://docs.python.org/3/library/asyncio.html) focusing on ease of use.
 
-So it's well suited for running tasks for web based applications (for instance file conversions). 
+Intetion is to support non-critical long running tasks, initiated directly from client (Web Browser, CLI client 
+or proxiing them from other backend (web server ...)). It was created for ebooks conversions, but any 
+other similar tasks will work well. 
 
-Python 3.5 only (due to new async and await keywords).
+ASEXOR is Python 3.5+ only (due to new async and await keywords).
 
-WARNING - API IS NOW UNDER REFACTORING.
+Key features
+------------
+
+- starts predefined Task in separate process
+- tasks can be very easily defined - in simplest case task is small wrapper around existing program - just defining
+  which options to provide and optionally how to parse results from stdout.
+- multi-tasks - some tasks can generate and schedule a bunch of other tasks ( like convert all files in 
+  given directory, etc.) 
+- scheduling and execution of tasks -  queues tasks and then executes them with limits on maximum number
+  of concurrently running tasks
+- instant updates of tasks status - start of execution, error, results, progress (in case of multi-tasks)
+- plugable authentication based on user token
+- tasks prioritization and authorizations based on user roles ( acquired during authentication)
+- support of several protocols:
+  * WebSocket (JS or Python Client)
+  * [WAMP](http://wamp-proto.org/) (JS or Python Client)
+  * Raw Socket - TCP or Unix socket (Python Client)
+  * HTTP Long Poll (POST+GET) - (JA or Python Client) 
 
 Getting started
 ---------------
-Example how to use is in `test` directory. Assure you have Python 3.5 as default python 
+Examples how to use ASEXOR are in `test` directory. Assure you have Python 3.5 as default python 
 interpreter or create virtual environment with Pyhton 3.5.
 To play without installing `git clone https://github.com/izderadicka/asexor`
 1. install requirements `pip install -r requirements.txt` (optional if not installed with setup.py)
@@ -30,11 +49,15 @@ Custom tasks
 ------------
 Custom tasks are created as subclasses of `asexor.task.BaseSimpleTask` - you need to override:
 - NAME, COMMAND, ARGS class properties
-- `validate_args` method -validates parameters from RPC call and turns them into arguments that should be passed to the command.  There is some basic support to define arguments in ARGS, but you can create them in this method from scratch.
+- `validate_args` method -validates parameters from RPC call and turns them into arguments that should be 
+  passed to the command.  There is some basic support to define arguments in ARGS, but you can create them 
+  in this method from scratch.
 - `parse_result` - creates RPC return value - either by parsing output of the command or by other method.
-- if task is to do something more complex, then just run some other program as subprocess, you can overide `execute` method and do whatever is required 
+- if task is to do something more complex, then just run some other program as subprocess, you can 
+  overide `execute` method and do whatever is required 
 
-Before custom tasks can be used they have to be registered by `task.load_tasks_form` function, which load all tasks from given module name. ( or `task.register` to register single task).
+Before custom tasks can be used they have to be registered by `asexor.task.load_tasks_from` function, 
+which load all tasks from given module name. ( or `asexortask.register` to register single task).
 
 For simple examples of tasks look at `test/tasks/simple_tasks.py`.
 

@@ -30,6 +30,7 @@ setup(name='asexor',
       install_requires=['cbor>=1.0.0'
                         'ujson>=1.35',
                         'aiohttp>=1.3.2',
+                        'aiohttp-cors>=0.5.0',
                         ],
       provides=['asexor'],
       keywords=['asyncio', 'tasks scheduler'],
