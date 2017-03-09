@@ -1,5 +1,6 @@
 import aiohttp
 from aiohttp import web
+import aiohttp_cors
 import asyncio
 import time
 import os
@@ -80,6 +81,8 @@ async def middleware(app, handler):
             except KeyError:
                 pass
     async def middleware_handler(request):
+        if request.method == 'OPTIONS':
+            return await handler(request)
         session_id = request.cookies.get(Config.LP.COOKIE_NAME)
         session = sessions.get(session_id) if session_id else None
         if session and time.time() - session.ts > Config.LP.MAX_SESSION_TIME:
@@ -193,8 +196,24 @@ class LpAsexorBackend(AbstractHttpBackend):
         self.app = web.Application(loop=self.loop, middlewares=(middleware,))
         self.app[ASEXOR_SESSION] = dict()
         session = AsexorBackendSession(tasks_queue, loop=self.app.loop)
-                
-        self.app.router.add_post('/', session.handle_call)
-        self.app.router.add_get('/', session.handle_messages)
+        
+        
+        res = self.app.router.add_resource('/')        
+        route_get=res.add_route('POST', session.handle_call)
+        route_post=res.add_route('GET', session.handle_messages)
+        
+        if Config.LP.ENABLE_CORS:
+            
+        
+            cors = aiohttp_cors.setup(self.app, defaults={
+                         Config.LP.CORS_ORIGIN : aiohttp_cors.ResourceOptions(
+                                allow_credentials= Config.LP.CORS_ALLOW_CREDENTIAL,
+                                expose_headers= Config.LP.CORS_EXPOSE_HEADERS,
+                                allow_headers= Config.LP.CORS_ALLOW_HEADERS,
+                            )
+                    })
+            cors.add(res)
+            cors.add(route_get)
+            cors.add(route_post)
         
         

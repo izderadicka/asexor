@@ -1,7 +1,7 @@
 import 'bootstrap';
 import 'bootstrap/css/bootstrap.css!';
 import $ from 'jquery';
-import {AsexorClient, WampAsexorClient} from 'izderadicka/asexor_js_client';
+import {AsexorClient, WampAsexorClient, LongPollAsexorClient} from 'izderadicka/asexor_js_client';
 import 'font-awesome';
 
 let startApp = function() {
@@ -15,6 +15,10 @@ let startApp = function() {
 		if (/use-wamp/.test(window.location.search)) {
 
 			client = new WampAsexorClient('ws://127.0.0.1:8880/ws', 'realm1', USER, USER);
+
+		} else if (/use-longpoll/.test(window.location.search)) {
+
+			client = new LongPollAsexorClient('http://localhost:8486', USER);
 
 		} else {
 

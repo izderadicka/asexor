@@ -64,6 +64,12 @@ class Config():
         # authentication function - takes one param - token,
         # return tuple - user_id, user_role
         AUTHENTICATION_PROCEDURE = None
+        # CORS - this allow cross side requests for any side with all headers - modify if need more strict access
+        ENABLE_CORS = True
+        CORS_ORIGIN = '*'
+        CORS_ALLOW_CREDENTIAL = True
+        CORS_ALLOW_HEADERS = '*'
+        CORS_EXPOSE_HEADERS = '*'
         
         
     
