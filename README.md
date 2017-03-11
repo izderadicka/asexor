@@ -15,7 +15,7 @@ ASEXOR is Python 3.5+ only (due to new async and await keywords).
 Key features
 ------------
 
-- starts predefined Task in separate process
+- starts predefined tasks in separate processes
 - tasks can be very easily defined - in simplest case task is small wrapper around existing program - just defining
   which options to provide and optionally how to parse results from stdout.
 - multi-tasks - some tasks can generate and schedule a bunch of other tasks ( like convert all files in 
