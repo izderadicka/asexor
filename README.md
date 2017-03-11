@@ -35,15 +35,24 @@ Getting started
 ---------------
 Examples how to use ASEXOR are in `test` directory. Assure you have Python 3.5 as default python 
 interpreter or create virtual environment with Pyhton 3.5.
-To play without installing `git clone https://github.com/izderadicka/asexor`
-1. install requirements `pip install -r requirements.txt` (optional if not installed with setup.py)
-2. cd to `asexor/test` directory
-3. run `PYTHONPATH=.. python dummy_backend.py -d` 
-4. open `http://localhost:8484/index.html` in recent modern browser (FF, Chrome).
-5. Select task and run 
-6. try also python client `PYTHONPATH=.. python dummy_client.py -n 10  -d user_name` in other terminal window
 
-for more tests, demos look at README file in test directory.
+To play without installing `git clone --depth 1 https://github.com/izderadicka/asexor`
+
+1. install requirements `pip install -r requirements.txt`
+2. cd to `asexor/test/dummy_client`
+3. [Install nodejs and npm](https://nodejs.org/en/download/), if not already installed
+4. build  Javascript client
+  ```
+  npm install jspm -g #if not already installed
+  jspm install
+  jspm bundle app.js --inject
+  ```
+5. cd to `asexor/test` directory
+6. run `PYTHONPATH=.. python dummy_backend.py -d` 
+7. open `http://localhost:8484/index.html` in recent modern browser (FF, Chrome).
+8. Select task (date or sleep) and run it
+
+For more tests, demos look at README file in `test` directory.
 
 Custom tasks
 ------------
