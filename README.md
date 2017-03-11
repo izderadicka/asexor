@@ -42,10 +42,11 @@ To play without installing `git clone --depth 1 https://github.com/izderadicka/a
 2. cd to `asexor/test/dummy_client`
 3. [Install nodejs and npm](https://nodejs.org/en/download/), if not already installed
 4. build  Javascript client
-    
+    ```
     npm install jspm -g #if not already installed
     jspm install
     jspm bundle app.js --inject
+    ```
 
 5. cd to `asexor/test` directory
 6. run `PYTHONPATH=.. python dummy_backend.py -d` 
