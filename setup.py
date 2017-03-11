@@ -27,7 +27,7 @@ setup(name='asexor',
       packages=['asexor', ],
       author='Ivan Zderadicka',
       author_email='ivan.zderadicka@gmail.com',
-      install_requires=['cbor>=1.0.0'
+      install_requires=['cbor>=1.0.0',
                         'ujson>=1.35',
                         'aiohttp>=1.3.2',
                         'aiohttp-cors>=0.5.0',
