@@ -25,12 +25,12 @@ Assure you have Python 3.5 as default python interpreter or create virtual envir
 
 1. install requirements `pip install -r requirements.txt`
 2. build  Javascript client (assuming nodejs and npm is already installed on your computer):
-   ```
-   # cd to test/dummy_client directory
-   npm install jspm -g #if not already installed
-   jspm install
-   jspm bundle app.js --inject
-   ```
+    
+    # cd to test/dummy_client directory
+    npm install jspm -g #if not already installed
+    jspm install
+    jspm bundle app.js --inject
+
 3. cd to `test` directory
 4. run `PYTHONPATH=.. python dummy_backend.py --use-raw --use-long-poll -d`. 
     Optionally you can also add `--use-wamp` option if crossbar WAMP router is running (run `crossbar start` from
