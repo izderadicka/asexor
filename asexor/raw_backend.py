@@ -74,6 +74,7 @@ class AsexorBackendSession(PrefixProtocol, TaskSchedulerMixin):
             logger.error('Configuration error for RAW.AUTHENTICATION_PROCEDURE - not function or coroutine')
             self.send(HS_CODE_OTHER_ERROR)
             self.transport.close()
+            return
         user = None
         try:
             user, role = await authenticator(token)
