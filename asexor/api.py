@@ -228,9 +228,9 @@ class AbstractClientWithCallMatch(AbstractClient):
         self._call_id+=1
         return cid
 
-    @property    
+    @abstractproperty    
     def active(self):
-        return bool(self._ws and not self._ws.closed)
+        pass
     
     
     async def execute(self, remote_name, *args, **kwargs):
@@ -239,7 +239,7 @@ class AbstractClientWithCallMatch(AbstractClient):
     
     async def execute_msg(self, msg_cls, *args, **kwargs):
         if not self.active:
-            raise RuntimeError('WebSocket is closed')
+            raise RuntimeError('Session is closed')
         call_id = self._next_call_id
         msg = msg_cls(call_id, *args, **kwargs)
         logger.debug('Message send: %s', msg)

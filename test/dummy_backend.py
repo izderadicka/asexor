@@ -74,6 +74,7 @@ if __name__ == '__main__':
         level = logging.INFO
         
     logging.basicConfig(level=level)
+    logging.getLogger('asyncio').setLevel(logging.WARN)
     curr_dir = os.path.dirname(__file__)
     client_dir = os.path.join(curr_dir, 'dummy_client')
     

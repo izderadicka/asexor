@@ -146,7 +146,7 @@ if __name__ == '__main__':
         session = LpAsexorClient(url, opts.user, loop=loop)
     else:
         from asexor.ws_client import AsexorClient
-        session = AsexorClient('http://localhost:8484/ws', opts.user, loop)
+        session = AsexorClient('ws://localhost:8484/ws', opts.user, loop)
     try:
         loop.run_until_complete(session.start())
     except:

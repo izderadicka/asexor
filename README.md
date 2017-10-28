@@ -4,7 +4,8 @@ ASEXOR
 ASEXOR = ASynchronous EXecutOR
 
 This module enables to execute defined tasks (processes) on remote machine. So nothing new - but this one 
-is based on  [Python Asyncio](https://docs.python.org/3/library/asyncio.html) focusing on ease of use.
+is based on  [Python Asyncio](https://docs.python.org/3/library/asyncio.html) and is focusing on ease of 
+use and low resources ovehead.
 
 Intetion is to support non-critical long running tasks, initiated directly from client (Web Browser, CLI client 
 or proxiing them from other backend (web server ...)). It was created for ebooks conversions, but any 
@@ -29,7 +30,7 @@ Key features
   * WebSocket (JS or Python Client)
   * [WAMP](http://wamp-proto.org/) (JS or Python Client)
   * Raw Socket - TCP or Unix socket (Python Client)
-  * HTTP Long Poll (POST+GET) - (JA or Python Client) 
+  * HTTP Long Poll (POST+GET) - (JS or Python Client) 
 
 Getting started
 ---------------
