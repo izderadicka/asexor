@@ -86,7 +86,7 @@ if __name__ == '__main__':
     
     # basic code to start aiohttp WS ASEXOR backend
     Config.WS.AUTHENTICATION_PROCEDURE = dummy_authenticate_simple
-    protocols =[(WsAsexorBackend, {'port':8484, 'static_dir':client_dir})]
+    protocols =[(WsAsexorBackend, {'port':8484, 'static_dir':client_dir, 'heartbeat':40})]
     
         
     if opts.use_wamp:

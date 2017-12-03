@@ -31,13 +31,14 @@ class CallContext(AbstractTaskContext):
 
 class AsexorBackendSession(TaskSchedulerMixin):
 
-    def __init__(self, tasks_queue, loop=None):
+    def __init__(self, tasks_queue, loop=None, heartbeat=None):
         if not Config.WS.AUTHENTICATION_PROCEDURE:
             raise ConfigError('WS.AUTHENTICATION_PROCEDURE is missing')
         self.autheticator = asure_coro_fn(Config.WS.AUTHENTICATION_PROCEDURE)
         self.websockets = defaultdict(set)
         self.handlers = defaultdict(set)
         self.tasks = tasks_queue
+        self.heartbeat=heartbeat
 
     def close_user_websockets(self, user):
         for handler in self.handlers[user]:
@@ -60,7 +61,7 @@ class AsexorBackendSession(TaskSchedulerMixin):
 
     async def ws_handler(self, request):
         user, role = await self.authenticate(request)
-        ws = web.WebSocketResponse()
+        ws = web.WebSocketResponse(heartbeat=self.heartbeat)
         await ws.prepare(request)
         self.websockets[user].add(ws)
         self.handlers[user].add(asyncio.Task.current_task())
@@ -112,13 +113,14 @@ class AsexorBackendSession(TaskSchedulerMixin):
 class WsAsexorBackend(AbstractHttpBackend):
     
     def __init__(self, loop, *, host='0.0.0.0', port=8484, 
-        ssl_context=None, backlog=128, static_dir=None):
+        ssl_context=None, backlog=128, static_dir=None, heartbeat=None):
         AbstractHttpBackend.__init__(self, loop, host=host, port=port, ssl_context=ssl_context, backlog=backlog)
         self.static_dir = static_dir
+        self.hearbeat=heartbeat
         
     def create_app(self, tasks_queue): 
         self.app = web.Application(loop=self.loop)
-        session = AsexorBackendSession(tasks_queue, self.app.loop)
+        session = AsexorBackendSession(tasks_queue, self.app.loop, heartbeat=self.hearbeat)
         self.app.on_shutdown.append(session.close_all_websockets)
         
         self.app.router.add_get('/ws', session.ws_handler)
