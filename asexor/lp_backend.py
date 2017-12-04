@@ -27,6 +27,9 @@ class Session:
         self.user = user
         self.active = True
         self._ready = asyncio.Event(loop=loop)
+    
+    def release_wait(self):
+        self._ready.set()
         
     def add_message(self, msg):
         if self.active:
@@ -36,7 +39,7 @@ class Session:
     async def get_messages(self):
         await self._ready.wait()
         messages = self.messages
-        assert messages
+        #assert messages
         self.messages = []
         self._ready.clear()
         return messages
@@ -107,7 +110,7 @@ async def middleware(app, handler):
             session.retire_task = app.loop.call_later(Config.LP.MAX_SESSION_INACTIVITY, retire, session_id)
             request['new_session'] = False
             logger.debug('Using existing session %s', session_id)
-            
+        request['initial_request'] = bool(request.headers.get('Authorization'))  
         request['session'] = session
             
             
@@ -179,10 +182,13 @@ class AsexorBackendSession(TaskSchedulerMixin):
         session = request['session']
         messages = []
         try:
-            if not request['new_session']: # for ne session return immediately to provide session_id
+            if not request['initial_request']: # for new or renewed session return immediately to provide session_id
                 messages = await asyncio.wait_for(session.get_messages(),
                                               Config.LP.LONG_POLL_TIMEOUT,
                                               loop = request.app.loop)
+            elif not request['new_session']:
+                #There might be long polling request pending from previous interaction - release it
+                session.release_wait()
         except asyncio.TimeoutError:
             pass
         

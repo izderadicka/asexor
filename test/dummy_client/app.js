@@ -46,6 +46,8 @@ let startApp = function () {
 
 			})
 			.catch((err) => {
+				let btn = 	$('#close-btn');
+				btn.text('Recreate Client');
 				let msg = `Cannot start ASEXOR client ${err}`;
 				console.error(msg);
 				alert(msg);
