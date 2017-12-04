@@ -45,6 +45,10 @@ class Config():
         # authentication function - takes one param - token,
         # return tuple - user_id, user_role
         AUTHENTICATION_PROCEDURE = None
+        # If > 0 this is interval in which server will send ping to keep connection open 
+        # and check that client is still alive
+        # (nginx for instance closes connection after 60 secs)
+        HEARTBEAT = None
     ####################################
     
     ###################################

@@ -28,17 +28,53 @@ class CallContext(AbstractTaskContext):
         except Exception:
             logger.exception('WS send failed')
 
-
+class SessionsMap():
+    def __init__(self):
+        self.websockets = defaultdict(dict)
+        self.handlers = defaultdict(dict)
+        
+    async def cancel_existing(self, user, session_id):
+        if user in self.websockets and session_id in self.websockets[user]:
+            ws = self.websockets[user][session_id]
+            await ws.close(code=aiohttp.WSCloseCode.OK, message="Closing as new connection for session %s is accepted"%session_id)
+            
+            #self.handlers[user][session_id].cancel()
+            #self.remove(user, session_id)
+            
+    def add(self, ws, user, session_id):
+        self.websockets[user][session_id] = ws
+        self.handlers[user][session_id] = asyncio.Task.current_task()
+    
+    def remove(self, user, session_id):
+        del self.websockets[user][session_id]
+        del self.handlers[user][session_id]
+        if not self.websockets[user]:
+            del self.websockets[user]
+            
+    async def close_all(self, code, message):
+        # here we have to be careful as self.websockets can be modified during iteration, because 
+        #  closing we can remote it from here asynchronously
+        # As it is just final cleanup we can allow overhead of copying data
+        users = copy(self.websockets)
+        for user in users:
+            if not user in self.websockets:
+                continue
+            active_ws = copy(self.websockets[user])
+            for _,ws in active_ws.items():
+                await ws.close(code=code,
+                               message=message)
+        self.websockets.clear()
+        self.handlers.clear()
+    
+    
 class AsexorBackendSession(TaskSchedulerMixin):
 
-    def __init__(self, tasks_queue, loop=None, heartbeat=None):
+    def __init__(self, tasks_queue, loop=None):
         if not Config.WS.AUTHENTICATION_PROCEDURE:
             raise ConfigError('WS.AUTHENTICATION_PROCEDURE is missing')
         self.autheticator = asure_coro_fn(Config.WS.AUTHENTICATION_PROCEDURE)
-        self.websockets = defaultdict(set)
-        self.handlers = defaultdict(set)
+        self.sessions = SessionsMap()
         self.tasks = tasks_queue
-        self.heartbeat=heartbeat
 
     def close_user_websockets(self, user):
         for handler in self.handlers[user]:
@@ -61,10 +97,14 @@ class AsexorBackendSession(TaskSchedulerMixin):
 
     async def ws_handler(self, request):
         user, role = await self.authenticate(request)
-        ws = web.WebSocketResponse(heartbeat=self.heartbeat)
+        session_id = request.rel_url.query.get('session_id')
+        ws = web.WebSocketResponse(heartbeat=Config.WS.HEARTBEAT)
+        if not session_id:
+            session_id = id(ws)
         await ws.prepare(request)
-        self.websockets[user].add(ws)
-        self.handlers[user].add(asyncio.Task.current_task())
+        await self.sessions.cancel_existing(user, session_id)
+        self.sessions.add(ws, user, session_id)
+        logger.debug("WS connected with session_id=%s", session_id)
 
         try:
             async for msg in ws:
@@ -96,31 +136,25 @@ class AsexorBackendSession(TaskSchedulerMixin):
         except asyncio.CancelledError:
             logger.info('WebSocket for user %s was canceled', user)
         finally:
-            self.websockets[user].remove(ws)
-            self.handlers[user].remove(asyncio.Task.current_task())
+            self.sessions.remove(user, session_id)
         return ws
 
     async def close_all_websockets(self, *args, **kwargs):
         code = kwargs.get('code', aiohttp.WSCloseCode.SERVICE_RESTART)
         message = kwargs.get('message', 'Server shutdown')
-        for user in self.websockets:
-            active_ws = copy(self.websockets[user])
-            for ws in active_ws:
-                await ws.close(code=code,
-                               message=message)
+        await self.sessions.close_all(code, message)
                 
                 
 class WsAsexorBackend(AbstractHttpBackend):
     
     def __init__(self, loop, *, host='0.0.0.0', port=8484, 
-        ssl_context=None, backlog=128, static_dir=None, heartbeat=None):
+        ssl_context=None, backlog=128, static_dir=None):
         AbstractHttpBackend.__init__(self, loop, host=host, port=port, ssl_context=ssl_context, backlog=backlog)
         self.static_dir = static_dir
-        self.hearbeat=heartbeat
         
     def create_app(self, tasks_queue): 
         self.app = web.Application(loop=self.loop)
-        session = AsexorBackendSession(tasks_queue, self.app.loop, heartbeat=self.hearbeat)
+        session = AsexorBackendSession(tasks_queue, self.app.loop)
         self.app.on_shutdown.append(session.close_all_websockets)
         
         self.app.router.add_get('/ws', session.ws_handler)

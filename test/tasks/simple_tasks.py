@@ -24,6 +24,9 @@ class SleepTask(BaseSimpleTask):
     COMMAND = 'sleep'
     ARGS = [Arg(0)]
     
+    async def parse_result(self,data):
+        logger.debug('Finished date task executed for user %s', self.user)
+    
 
 class GenericMultiTask(BaseMultiTask):
     NAME = 'multi'
