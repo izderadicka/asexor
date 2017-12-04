@@ -17,19 +17,26 @@ logger = logging.getLogger('ws_backend')
 
 class CallContext(AbstractTaskContext):
 
-    def __init__(self, call_id, ws):
-        self._ws = ws
+    def __init__(self, call_id, user, session_id, sessions):
+        self._sessions = sessions
         self.call_id = call_id
+        self.user = user
+        self.session_id = session_id
 
     def send(self, task_id, **kwargs):
+        ws = self._sessions.get(self.user, self.session_id)
+        if not ws:
+            logger.warn("WS sesssion user: %s id: %s expired - not sending updates", self.user,self.session_id)
+            return
         kwargs['task_id']=task_id
         try:
-            self._ws.send_str(UpdateMessage(self.call_id, kwargs).as_json())
+            ws.send_str(UpdateMessage(self.call_id, kwargs).as_json())
         except Exception:
             logger.exception('WS send failed')
 
 class SessionsMap():
-    def __init__(self):
+    def __init__(self, loop):
+        self.loop = loop
         self.websockets = defaultdict(dict)
         self.handlers = defaultdict(dict)
         
@@ -40,6 +47,12 @@ class SessionsMap():
             
             #self.handlers[user][session_id].cancel()
             #self.remove(user, session_id)
+            
+    def get(self, user, session_id):
+        try:
+            return self.websockets[user][session_id]
+        except KeyError:
+            return None
             
     def add(self, ws, user, session_id):
         self.websockets[user][session_id] = ws
@@ -69,12 +82,13 @@ class SessionsMap():
     
 class AsexorBackendSession(TaskSchedulerMixin):
 
-    def __init__(self, tasks_queue, loop=None):
+    def __init__(self, tasks_queue, loop):
         if not Config.WS.AUTHENTICATION_PROCEDURE:
             raise ConfigError('WS.AUTHENTICATION_PROCEDURE is missing')
         self.autheticator = asure_coro_fn(Config.WS.AUTHENTICATION_PROCEDURE)
-        self.sessions = SessionsMap()
+        self.sessions = SessionsMap(loop)
         self.tasks = tasks_queue
+        self.loop = loop
 
     def close_user_websockets(self, user):
         for handler in self.handlers[user]:
@@ -117,7 +131,7 @@ class AsexorBackendSession(TaskSchedulerMixin):
                             ws.send_str(ErrorMessage(e.call_id, str(e) or 'Invalid message').as_json())
                         logger.exception('Invalid message %s', msg.data)
                         continue
-                    ctx = CallContext(call.call_id, ws)
+                    ctx = CallContext(call.call_id, user, session_id, self.sessions)
                     try:
                         task_id = await self.schedule_task(
                             ctx, user, role, call.task_name, *call.args, **call.kwargs)
