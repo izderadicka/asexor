@@ -5,6 +5,7 @@ from aiohttp import web
 import aiohttp
 import traceback
 from copy import copy
+from collections import namedtuple
 
 from asexor.api import AbstractTaskContext, AbstractHttpBackend
 from asexor.config import Config, ConfigError
@@ -33,52 +34,69 @@ class CallContext(AbstractTaskContext):
             ws.send_str(UpdateMessage(self.call_id, kwargs).as_json())
         except Exception:
             logger.exception('WS send failed')
-
+        self._sessions.reset_timeout(self.session_id)
+            
+class Session:
+    __slots__ = ('ws', 'handle', 'timeout')
+    def __init__(self, ws, handle, timeout=None):
+        self.ws = ws
+        self.handle = handle
+        self.timeout = timeout
+        
+    def update_timeout(self, to):
+        if self.timeout: 
+            self.timeout.cancel()
+        self.timeout = to
+        
+        
 class SessionsMap():
     def __init__(self, loop):
         self.loop = loop
-        self.websockets = defaultdict(dict)
-        self.handlers = defaultdict(dict)
+        self._sessions = defaultdict(dict)
         
     async def cancel_existing(self, user, session_id):
-        if user in self.websockets and session_id in self.websockets[user]:
-            ws = self.websockets[user][session_id]
-            await ws.close(code=aiohttp.WSCloseCode.OK, message="Closing as new connection for session %s is accepted"%session_id)
+        if user in self._sessions and session_id in self._sessions[user]:
+            session = self._sessions[user][session_id]
+            session.handler.cancel()
+            await session.ws.close(code=aiohttp.WSCloseCode.OK, message="Closing as new connection for session %s is accepted"%session_id)
             
-            #self.handlers[user][session_id].cancel()
-            #self.remove(user, session_id)
             
     def get(self, user, session_id):
         try:
-            return self.websockets[user][session_id]
+            return self._sessions[user][session_id].ws
         except KeyError:
             return None
             
     def add(self, ws, user, session_id):
-        self.websockets[user][session_id] = ws
-        self.handlers[user][session_id] = asyncio.Task.current_task()
+        session=Session(ws, asyncio.Task.current_task())
+        self._sessions[user][session_id] = session
+        self.reset_timeout(session_id)
+        
+    def reset_timeout(self, session_id):
+        if Config.WS.INACTIVE_TIMEOUT:
+            self.loop.call_later(Config.WS.INACTIVE_TIMEOUT, 
+                                 lambda sid: self.loop.create_task(self.cancel_existing(sid)), 
+                                 session_id)
     
     def remove(self, user, session_id):
-        del self.websockets[user][session_id]
-        del self.handlers[user][session_id]
-        if not self.websockets[user]:
-            del self.websockets[user]
+        del self._sessions[user][session_id]
+        if not self._sessions[user]:
+            del self._sessions[user]
             
     async def close_all(self, code, message):
         # here we have to be careful as self.websockets can be modified during iteration, because 
         #  closing we can remote it from here asynchronously
         # As it is just final cleanup we can allow overhead of copying data
-        users = copy(self.websockets)
+        users = copy(self._sessions)
         for user in users:
-            if not user in self.websockets:
+            if not user in self._sessions:
                 continue
-            active_ws = copy(self.websockets[user])
-            for _,ws in active_ws.items():
-                await ws.close(code=code,
+            active_ws = copy(self._sessions[user])
+            for _,s in active_ws.items():
+                await s.ws.close(code=code,
                                message=message)
-        self.websockets.clear()
-        self.handlers.clear()
-    
+        self._sessions.clear()
+
     
 class AsexorBackendSession(TaskSchedulerMixin):
 
@@ -138,6 +156,7 @@ class AsexorBackendSession(TaskSchedulerMixin):
                         res = ReplyMessage(call.call_id, task_id)
                         logger.debug('Sending respose: %s', res)
                         ws.send_str(res.as_json())
+                        self.sessions.reset_timeout(session_id)
                     except Exception as e:
                         error = str(e) or repr(e)
                         tb = traceback.format_exc() if Config.SEND_REMOTE_ERROR_STACK else None

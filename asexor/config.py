@@ -49,6 +49,9 @@ class Config():
         # and check that client is still alive
         # (nginx for instance closes connection after 60 secs)
         HEARTBEAT = None
+        # Server will close WS after x secs of inactivity (no incoming or outcoming message)
+        # None or zero  means no timeout
+        INACTIVE_TIMEOUT = 3600
     ####################################
     
     ###################################
