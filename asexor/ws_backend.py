@@ -34,7 +34,7 @@ class CallContext(AbstractTaskContext):
             ws.send_str(UpdateMessage(self.call_id, kwargs).as_json())
         except Exception:
             logger.exception('WS send failed')
-        self._sessions.reset_timeout(self.session_id)
+        self._sessions.reset_timeout(self.user, self.session_id)
             
 class Session:
     __slots__ = ('ws', 'handle', 'timeout')
@@ -57,9 +57,8 @@ class SessionsMap():
     async def cancel_existing(self, user, session_id):
         if user in self._sessions and session_id in self._sessions[user]:
             session = self._sessions[user][session_id]
-            session.handler.cancel()
-            await session.ws.close(code=aiohttp.WSCloseCode.OK, message="Closing as new connection for session %s is accepted"%session_id)
-            
+            session.handle.cancel()
+            await session.ws.close(code=aiohttp.WSCloseCode.OK, message="Closing session %s replaced or timeout"%session_id)
             
     def get(self, user, session_id):
         try:
@@ -70,13 +69,13 @@ class SessionsMap():
     def add(self, ws, user, session_id):
         session=Session(ws, asyncio.Task.current_task())
         self._sessions[user][session_id] = session
-        self.reset_timeout(session_id)
+        self.reset_timeout(user, session_id)
         
-    def reset_timeout(self, session_id):
+    def reset_timeout(self, user, session_id):
         if Config.WS.INACTIVE_TIMEOUT:
             self.loop.call_later(Config.WS.INACTIVE_TIMEOUT, 
-                                 lambda sid: self.loop.create_task(self.cancel_existing(sid)), 
-                                 session_id)
+                                 lambda u, sid: self.loop.create_task(self.cancel_existing(u, sid)), 
+                                 user, session_id)
     
     def remove(self, user, session_id):
         del self._sessions[user][session_id]
@@ -156,7 +155,7 @@ class AsexorBackendSession(TaskSchedulerMixin):
                         res = ReplyMessage(call.call_id, task_id)
                         logger.debug('Sending respose: %s', res)
                         ws.send_str(res.as_json())
-                        self.sessions.reset_timeout(session_id)
+                        self.sessions.reset_timeout(user, session_id)
                     except Exception as e:
                         error = str(e) or repr(e)
                         tb = traceback.format_exc() if Config.SEND_REMOTE_ERROR_STACK else None

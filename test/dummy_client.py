@@ -145,8 +145,9 @@ if __name__ == '__main__':
         url='http://localhost:8486/'
         session = LpAsexorClient(url, opts.user, loop=loop)
     else:
+        session_id = random.randint(1,1000000000)
         from asexor.ws_client import AsexorClient
-        session = AsexorClient('ws://localhost:8484/ws', opts.user, loop)
+        session = AsexorClient('ws://localhost:8484/ws', opts.user, session_id=session_id, loop=loop)
     try:
         loop.run_until_complete(session.start())
     except:

@@ -9,11 +9,12 @@ logger = logging.getLogger('ws_client')
 
 class AsexorClient(AbstractClientWithCallMatch):
     
-    def __init__(self, url, token, loop=None):
+    def __init__(self, url, token, session_id=None, loop=None):
         AbstractClientWithCallMatch.__init__(self, loop)
         self._ws = None
         self.url = url
         self.token = token
+        self.session_id = session_id
         
     
     @property    
@@ -27,7 +28,10 @@ class AsexorClient(AbstractClientWithCallMatch):
     async def run(self):
         try:
             async with aiohttp.ClientSession(loop=self.loop) as session:
-                async with session.ws_connect('%s?token=%s'% (self.url, self.token)) as self._ws:
+                url = '%s?token=%s'% (self.url, self.token)
+                if self.session_id:
+                    url+="&session_id=%s"% self.session_id
+                async with session.ws_connect(url) as self._ws:
                     self.set_ready()
                     async for msg in self._ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
