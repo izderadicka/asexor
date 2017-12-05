@@ -26,12 +26,14 @@ class CallContext(AbstractTaskContext):
 
     def send(self, task_id, **kwargs):
         ws = self._sessions.get(self.user, self.session_id)
-        if not ws:
-            logger.warn("WS sesssion user: %s id: %s expired - not sending updates", self.user,self.session_id)
-            return
         kwargs['task_id']=task_id
+        msg = UpdateMessage(self.call_id, kwargs).as_json()
+        if not ws:
+            logger.warn("WS sesssion user: %s id: %s expired - saving messages", self.user,self.session_id)
+            self._sessions.add_to_unsent(msg, self.user, self.session_id)
+            return
         try:
-            ws.send_str(UpdateMessage(self.call_id, kwargs).as_json())
+            ws.send_str(msg)
         except Exception:
             logger.exception('WS send failed')
         self._sessions.reset_timeout(self.user, self.session_id)
@@ -53,9 +55,11 @@ class SessionsMap():
     def __init__(self, loop):
         self.loop = loop
         self._sessions = defaultdict(dict)
+        self._unsent = defaultdict(dict)
         
     async def cancel_existing(self, user, session_id):
         if user in self._sessions and session_id in self._sessions[user]:
+            logger.debug("Cancelling session user: %s, id: %s", user, session_id)
             session = self._sessions[user][session_id]
             session.handle.cancel()
             await session.ws.close(code=aiohttp.WSCloseCode.OK, message="Closing session %s replaced or timeout"%session_id)
@@ -65,6 +69,31 @@ class SessionsMap():
             return self._sessions[user][session_id].ws
         except KeyError:
             return None
+        
+    def add_to_unsent(self, msg, user, session_id):
+        if user in self._unsent and session_id in self._unsent[user]:
+            self._unsent[user][session_id].append(msg)
+        else:
+            def rm(user, session_id):
+                if user in self._unsent and session_id in self._unsent[user]:
+                    logger.warn("Removing unsent mesages for user: %s session id: %s", user, session_id)
+                    del self._unsent[user][session_id]
+                    if not self._unsent[user]:
+                        del self._unsent[user]
+            h = self.loop.call_later(Config.WS.UNSENT_MSG_TIMEOUT, rm, user, session_id)
+            self._unsent[user][session_id]=[h,msg]
+            
+            
+    def send_unsent(self,user, session_id):
+        if user in self._unsent and session_id in self._unsent[user]:
+            unsent = self._unsent[user][session_id]
+            del self._unsent[user][session_id]
+            h = unsent[0]
+            h.cancel()
+            ws = self._sessions[user][session_id].ws
+            for m in unsent[1:]:
+                ws.send_str(m)
+        
             
     def add(self, ws, user, session_id):
         session=Session(ws, asyncio.Task.current_task())
@@ -73,9 +102,11 @@ class SessionsMap():
         
     def reset_timeout(self, user, session_id):
         if Config.WS.INACTIVE_TIMEOUT:
-            self.loop.call_later(Config.WS.INACTIVE_TIMEOUT, 
+            timeout = self.loop.call_later(Config.WS.INACTIVE_TIMEOUT, 
                                  lambda u, sid: self.loop.create_task(self.cancel_existing(u, sid)), 
                                  user, session_id)
+            if user in self._sessions and session_id in self._sessions[user]:
+                self._sessions[user][session_id].update_timeout(timeout)
     
     def remove(self, user, session_id):
         del self._sessions[user][session_id]
@@ -95,6 +126,7 @@ class SessionsMap():
                 await s.ws.close(code=code,
                                message=message)
         self._sessions.clear()
+        self._unsent.clear()
 
     
 class AsexorBackendSession(TaskSchedulerMixin):
@@ -135,6 +167,7 @@ class AsexorBackendSession(TaskSchedulerMixin):
         await ws.prepare(request)
         await self.sessions.cancel_existing(user, session_id)
         self.sessions.add(ws, user, session_id)
+        self.sessions.send_unsent(user, session_id)
         logger.debug("WS connected with session_id=%s", session_id)
 
         try:

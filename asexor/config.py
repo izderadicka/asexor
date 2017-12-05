@@ -52,6 +52,10 @@ class Config():
         # Server will close WS after x secs of inactivity (no incoming or outcoming message)
         # None or zero  means no timeout
         INACTIVE_TIMEOUT = 3600
+        # If session is interrupted unsent messages are temporally saved, hoping for session to reconnect
+        # It time is secs (from first unsent message), how long messages will be saved before forgotten, 
+        # if reconnect does not happen 
+        UNSENT_MSG_TIMEOUT = 60
     ####################################
     
     ###################################
