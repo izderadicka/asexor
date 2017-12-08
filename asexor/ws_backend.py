@@ -109,6 +109,9 @@ class SessionsMap():
                 self._sessions[user][session_id].update_timeout(timeout)
     
     def remove(self, user, session_id):
+        timeout = self._sessions[user][session_id].timeout
+        if timeout:
+            timeout.cancel()
         del self._sessions[user][session_id]
         if not self._sessions[user]:
             del self._sessions[user]
