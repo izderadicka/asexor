@@ -6,6 +6,9 @@ ujson==1.35
 autobahn>=0.14.1,<=0.16.0
 crossbar>=0.14.0
 
+#pin secondary dependencies
+yarl<=0.13.0
+
 
 #development requirements
 pytest
