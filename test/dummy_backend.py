@@ -87,7 +87,7 @@ if __name__ == '__main__':
     # basic code to start aiohttp WS ASEXOR backend
     Config.WS.AUTHENTICATION_PROCEDURE = dummy_authenticate_simple
     Config.WS.HEARTBEAT = 40
-    Config.WS.INACTIVE_TIMEOUT = 60
+    Config.WS.INACTIVE_TIMEOUT = 600
     protocols =[(WsAsexorBackend, {'port':8484, 'static_dir':client_dir})]
     
         
